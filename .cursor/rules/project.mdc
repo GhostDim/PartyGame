@@ -1,7 +1,12 @@
+---
+alwaysApply: true
+---
+
 Ты опытный Fullstack и IoT-разработчик. Мы делаем интерактивную локальную пати-игру (наподобие Jackbox / "Своя Игра") для вечеринки на 4–8 человек.
 
 Ограничения и среда:
-- Сервер крутится на Raspberry Pi Zero 2 W (всего 512 МБ RAM, 4 ядра ARM Cortex-A53).
+- Сервер крутится на Raspberry Pi Zero 2 W (всего 512 МБ RAM, 4 ядра ARM Cortex-A53). 
+- Прошивка оригинальная lite версия.
 - Никаких тяжелых сборок (Webpack/Vite/Next.js/React не использовать).
 - Стек бэкенда: Node.js (Express + Socket.io) ИЛИ Python (FastAPI + WebSockets/Uvicorn).
 - Стек фронтенда: Чистый Vanilla JS + HTML5 + CSS (Tailwind/Bootstrap через CDN или один компактный CSS-файл). Должно отдаваться сервером как статика.
