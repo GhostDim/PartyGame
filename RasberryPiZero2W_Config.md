@@ -1,39 +1,24 @@
 Плата
 
-Плата: Rasberry Pi Zero 2W
-
-host: PartyBox
-
-user: gost
-
-password: gost
-
-ssid: server Pentagona
-
-wi-fi-pass: EDA8HD6D6J
-
-
+&#x09;Плата: Rasberry Pi Zero 2W
+&#x09;host: PartyBox
+&#x09;user: gost
+&#x09;password: gost
+&#x09;ssid: server Pentagona
+&#x09;wi-fi-pass: EDA8HD6D6J
 
 Компоненты
 
-Усилитель аудио - MAX98357A
-
-Бустер 5.15V - MT3608
-
-Зарядка -
-
-Аккумулятор - 18650 2шт.
-
-
+&#x09;Усилитель аудио - MAX98357A
+&#x09;Бустер 5.15V - MT3608
+&#x09;Зарядка -
+&#x09;Аккумулятор - 18650 2шт.
 
 Команды
 
 &#x09;ping PartyBox.local
-
 &#x09;ssh gost@PartyBox.local
-
 &#x09;sudo reboot
-
 &#x09;sudo poweroff
 
 Сброс ssh при ошибке:
@@ -48,25 +33,15 @@ wi-fi-pass: EDA8HD6D6J
 
 &#x09;node server.js
 
-Выключить (если нет кнопки) Сохранить Ctrl + O ➔ Enter ➔ Ctrl + X.
+Выключить
 
 &#x09;sudo poweroff
 
-
+---
 
 Что подключено\\настроено на плате:
 
-~~1. Автоматический ремонт диска при старте~~
-
-&#x09;~~sudo nano /boot/firmware/cmdline.txt~~
-
-~~В самый конец единственной строки (строго через пробел, не нажимая Enter) добавить:~~
-
-&#x09;~~fsck.repair=yes~~
-
-
-
-2\. Автоматическая регенерация поврежденных ключей SSH
+1\. Автоматическая регенерация поврежденных ключей SSH
 
 Выполните команду активации встроенного генератора ключей:
 
@@ -76,9 +51,7 @@ wi-fi-pass: EDA8HD6D6J
 
 &#x09;sudo systemctl enable ssh
 
-
-
-3\. Кнопка питания - Pin 5, Pin 6
+2\. Кнопка питания - Pin 5, Pin 6
 
 Активируйте обработку кнопки в системе:
 
@@ -89,22 +62,17 @@ wi-fi-pass: EDA8HD6D6J
 &#x09;dtoverlay=gpio-shutdown,gpio\_pin=3
 
 
-
-4\. Увеличение подкачки до 1Гб
+3\. Увеличение подкачки до 1Гб
 
 &#x09;sudo fallocate -l 1G /swapfile
-
 &#x09;sudo chmod 600 /swapfile
-
 &#x09;sudo mkswap /swapfile
-
 &#x09;sudo swapon /swapfile
-
 &#x09;echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 
 Критерий успеха: команда free -m показывает в строке Swap около 1024 МБ.
 
-
+---
 
 Установки для игры:
 
