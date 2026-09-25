@@ -47,6 +47,20 @@
       <p id="play-note" class="wait">Кнопки раунда появятся на этом экране.</p>
     </section>
   </div>
+  <button id="open-settings" class="fab fab-settings" type="button" hidden>Настройки</button>
+  <dialog id="player-settings" class="sheet">
+    <form id="settings-form">
+      <h2>Настройки</h2>
+      <label for="settings-nick">Имя</label>
+      <input id="settings-nick" maxlength="16" autocomplete="nickname" required>
+      <p class="label">Аватар</p>
+      <div id="settings-avatars" class="avatar-picker"></div>
+      <p id="settings-error" class="error" hidden></p>
+      <button type="submit">Сохранить</button>
+      <button id="leave-btn" class="ghost" type="button">Выйти</button>
+      <button id="settings-close" class="ghost" type="button">Закрыть</button>
+    </form>
+  </dialog>
   <script src="/socket.io/socket.io.js"></script>
   <script src="/common.js"></script>
   <script src="/player.js"></script>

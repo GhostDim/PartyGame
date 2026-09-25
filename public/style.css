@@ -52,7 +52,10 @@ select:focus-visible {
   padding: 24px 16px 32px;
 }
 
-.page-admin .wrap { width: min(100%, 640px); }
+.page-player .wrap,
+.page-admin .wrap {
+  padding-bottom: 108px;
+}
 
 .panel {
   background: var(--card);
@@ -330,6 +333,55 @@ button.go {
 
 @keyframes pulse {
   50% { opacity: 0.45; }
+}
+
+.fab {
+  position: fixed;
+  z-index: 4;
+  right: 16px;
+  min-height: 44px;
+  padding: 0 14px;
+  color: var(--text);
+  background: #2a2140;
+  border: 1px solid var(--line);
+}
+
+.fab-settings { bottom: 16px; }
+
+.fab-host { bottom: 68px; background: #3a2a12; color: var(--amber); }
+
+dialog.sheet {
+  width: min(100% - 24px, 440px);
+  max-height: calc(100vh - 24px);
+  margin: auto;
+  padding: 18px;
+  overflow: auto;
+  color: inherit;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+}
+
+dialog.host-sheet { width: min(100% - 24px, 640px); }
+
+dialog.sheet::backdrop { background: rgba(0, 0, 0, 0.55); }
+
+button.ghost {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 8px;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid #3a3150;
+}
+
+button.kick {
+  min-height: 36px;
+  padding: 0 10px;
+  color: #ff8aa8;
+  background: transparent;
+  border: 1px solid #ff8aa8;
+  border-radius: 10px;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -170,6 +170,50 @@ io.on('connection', (socket) => {
     broadcast();
   });
 
+  socket.on('player_update', (payload) => {
+    const result = state.updateProfile(socket.data.playerId, payload || {});
+    if (!result.ok) {
+      socket.emit('player_rejected', { message: result.error });
+      return;
+    }
+    socket.emit('player_ready', { player: result.player });
+    broadcast();
+  });
+
+  socket.on('player_leave', () => {
+    const playerId = socket.data.playerId;
+    if (!playerId) return;
+    state.remove(playerId);
+    socket.data.playerId = null;
+    socket.emit('player_left');
+    votesUpdated();
+    broadcast();
+  });
+
+  socket.on('admin_kick', (payload) => {
+    if (!requireAdmin(socket)) return;
+    const playerId = payload && payload.playerId;
+    if (!playerId) return;
+    if (playerId === socket.data.playerId) {
+      socket.emit('admin_notice', { message: 'Себя уберите через «Выйти» в настройках' });
+      return;
+    }
+    const result = state.remove(playerId);
+    if (!result.ok) {
+      socket.emit('admin_notice', { message: result.error });
+      return;
+    }
+    if (result.socketId) {
+      const target = io.sockets.sockets.get(result.socketId);
+      if (target) {
+        target.data.playerId = null;
+        target.emit('player_kicked');
+      }
+    }
+    votesUpdated();
+    broadcast();
+  });
+
   socket.on('player_vote', (payload) => {
     const result = state.vote(socket.data.playerId, payload && payload.gameId);
     if (!result.ok) {

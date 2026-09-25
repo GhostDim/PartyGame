@@ -10,7 +10,12 @@
 <body class="page-admin">
   <p id="conn" class="conn" hidden>Нет связи с консолью, переподключение…</p>
   <div class="wrap">
-    <section id="view-login" class="panel">
+    <section id="view-boot" class="panel">
+      <p class="brand">PartyBox</p>
+      <h1>Подключение…</h1>
+    </section>
+
+    <section id="view-login" class="panel" hidden>
       <p class="brand">PartyBox</p>
       <h1>Вход ведущего</h1>
       <form id="login-form">
@@ -21,30 +26,78 @@
       </form>
     </section>
 
-    <section id="view-panel" class="panel" hidden>
+    <section id="view-join" class="panel" hidden>
       <p class="brand">PartyBox</p>
-      <h1>Пульт ведущего</h1>
+      <h1>Как тебя зовут?</h1>
+      <p class="wait">Дальше вы в лобби как игрок и можете запустить игру.</p>
+      <form id="join-form">
+        <label for="nick">Имя</label>
+        <input id="nick" name="nick" maxlength="16" autocomplete="nickname" required>
+        <p class="label">Аватар</p>
+        <div id="avatars" class="avatar-picker"></div>
+        <p id="join-error" class="error" hidden></p>
+        <button type="submit">Войти в лобби</button>
+      </form>
+    </section>
 
-      <h2>Игроки</h2>
-      <ul id="players" class="player-list"></ul>
+    <section id="view-lobby" class="panel" hidden>
+      <header class="me">
+        <span id="me-avatar" class="face"></span>
+        <div>
+          <strong id="me-name"></strong>
+          <span id="me-score" class="muted"></span>
+        </div>
+      </header>
+      <p class="chip">Вы ведущий</p>
+      <p id="tv-chip" class="chip" hidden>Только телефоны</p>
+      <p id="wait-note" class="wait" aria-live="polite">Ожидание запуска игры ведущим...</p>
+      <div id="games" class="game-list"></div>
+    </section>
 
-      <label class="toggle">
-        <input id="tv-mode" type="checkbox" checked>
-        <span class="toggle-ui"></span>
-        <span id="tv-mode-label">С экраном ТВ</span>
-      </label>
-
-      <h2>Голоса</h2>
-      <div id="votes" class="vote-list"></div>
-
-      <label for="game-select">Игра к запуску</label>
-      <select id="game-select"></select>
-      <p id="start-hint" class="wait"></p>
-      <button id="start" class="go" type="button">Начать игру</button>
+    <section id="view-play" class="panel" hidden>
+      <p class="brand">PartyBox</p>
+      <h1 id="play-title">Игра началась</h1>
+      <p id="play-note" class="wait">Кнопки раунда появятся на этом экране.</p>
     </section>
   </div>
+
+  <button id="open-host" class="fab fab-host" type="button" hidden>Пульт</button>
+  <button id="open-settings" class="fab fab-settings" type="button" hidden>Настройки</button>
+
+  <dialog id="player-settings" class="sheet">
+    <form id="settings-form">
+      <h2>Настройки</h2>
+      <label for="settings-nick">Имя</label>
+      <input id="settings-nick" maxlength="16" autocomplete="nickname" required>
+      <p class="label">Аватар</p>
+      <div id="settings-avatars" class="avatar-picker"></div>
+      <p id="settings-error" class="error" hidden></p>
+      <button type="submit">Сохранить</button>
+      <button id="leave-btn" class="ghost" type="button">Выйти</button>
+      <button id="settings-close" class="ghost" type="button">Закрыть</button>
+    </form>
+  </dialog>
+
+  <dialog id="host-sheet" class="sheet host-sheet">
+    <h2>Пульт ведущего</h2>
+    <p class="label">Игроки</p>
+    <ul id="players" class="player-list"></ul>
+    <label class="toggle">
+      <input id="tv-mode" type="checkbox" checked>
+      <span class="toggle-ui"></span>
+      <span id="tv-mode-label">С экраном ТВ</span>
+    </label>
+    <p class="label">Голоса</p>
+    <div id="votes" class="vote-list"></div>
+    <label for="game-select">Игра к запуску</label>
+    <select id="game-select"></select>
+    <p id="start-hint" class="wait"></p>
+    <button id="start" class="go" type="button">Начать игру</button>
+    <button id="host-close" class="ghost" type="button">Закрыть</button>
+  </dialog>
+
   <script src="/socket.io/socket.io.js"></script>
   <script src="/common.js"></script>
-  <script src="/admin.js"></script>
+  <script src="/player.js"></script>
 </body>
 </html>
