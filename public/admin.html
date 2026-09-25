@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#100d16">
+  <title>PartyBox — ведущий</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="page-admin">
+  <p id="conn" class="conn" hidden>Нет связи с консолью, переподключение…</p>
+  <div class="wrap">
+    <section id="view-login" class="panel">
+      <p class="brand">PartyBox</p>
+      <h1>Вход ведущего</h1>
+      <form id="login-form">
+        <label for="password">Пароль</label>
+        <input id="password" type="password" autocomplete="current-password" required>
+        <p id="login-error" class="error" hidden></p>
+        <button type="submit">Войти</button>
+      </form>
+    </section>
+
+    <section id="view-panel" class="panel" hidden>
+      <p class="brand">PartyBox</p>
+      <h1>Пульт ведущего</h1>
+
+      <h2>Игроки</h2>
+      <ul id="players" class="player-list"></ul>
+
+      <label class="toggle">
+        <input id="tv-mode" type="checkbox" checked>
+        <span class="toggle-ui"></span>
+        <span id="tv-mode-label">С экраном ТВ</span>
+      </label>
+
+      <h2>Голоса</h2>
+      <div id="votes" class="vote-list"></div>
+
+      <label for="game-select">Игра к запуску</label>
+      <select id="game-select"></select>
+      <p id="start-hint" class="wait"></p>
+      <button id="start" class="go" type="button">Начать игру</button>
+    </section>
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/common.js"></script>
+  <script src="/admin.js"></script>
+</body>
+</html>

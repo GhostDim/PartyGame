@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#100d16">
+  <title>PartyBox</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="page-player">
+  <p id="conn" class="conn" hidden>Нет связи с консолью, переподключение…</p>
+  <div class="wrap">
+    <section id="view-boot" class="panel">
+      <p class="brand">PartyBox</p>
+      <h1>Подключение…</h1>
+    </section>
+
+    <section id="view-join" class="panel" hidden>
+      <p class="brand">PartyBox</p>
+      <h1>Как тебя зовут?</h1>
+      <form id="join-form">
+        <label for="nick">Имя</label>
+        <input id="nick" name="nick" maxlength="16" autocomplete="nickname" required>
+        <p class="label">Аватар</p>
+        <div id="avatars" class="avatar-picker"></div>
+        <p id="join-error" class="error" hidden></p>
+        <button type="submit">Войти в лобби</button>
+      </form>
+    </section>
+
+    <section id="view-lobby" class="panel" hidden>
+      <header class="me">
+        <span id="me-avatar" class="face"></span>
+        <div>
+          <strong id="me-name"></strong>
+          <span id="me-score" class="muted"></span>
+        </div>
+      </header>
+      <p id="tv-chip" class="chip" hidden>Только телефоны</p>
+      <p id="wait-note" class="wait" aria-live="polite">Ожидание запуска игры ведущим...</p>
+      <div id="games" class="game-list"></div>
+    </section>
+
+    <section id="view-play" class="panel" hidden>
+      <p class="brand">PartyBox</p>
+      <h1 id="play-title">Игра началась</h1>
+      <p id="play-note" class="wait">Кнопки раунда появятся на этом экране.</p>
+    </section>
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/common.js"></script>
+  <script src="/player.js"></script>
+</body>
+</html>

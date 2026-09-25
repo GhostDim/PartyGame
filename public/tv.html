@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#100d16">
+  <title>PartyBox — экран</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="page-tv">
+  <p id="conn" class="conn" hidden>Нет связи с консолью, переподключение…</p>
+  <div class="wrap">
+    <p id="phones-banner" class="banner" hidden>Ведущий включил режим «Только телефоны»</p>
+    <header>
+      <p class="brand">PartyBox</p>
+      <h1 id="tv-title">Лобби</h1>
+      <p id="tv-status" class="wait is-waiting">Ожидание гостей</p>
+    </header>
+    <ul id="guests" class="guest-grid"></ul>
+    <div id="bars" class="tv-bars"></div>
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/common.js"></script>
+  <script src="/tv.js"></script>
+</body>
+</html>
