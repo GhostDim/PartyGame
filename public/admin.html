@@ -29,7 +29,6 @@
     <section id="view-join" class="panel" hidden>
       <p class="brand">PartyBox</p>
       <h1>Как тебя зовут?</h1>
-      <p class="wait">Дальше вы в лобби как игрок и можете запустить игру.</p>
       <form id="join-form">
         <label for="nick">Имя</label>
         <input id="nick" name="nick" maxlength="16" autocomplete="nickname" required>
@@ -48,8 +47,6 @@
           <span id="me-score" class="muted"></span>
         </div>
       </header>
-      <p class="chip">Вы ведущий</p>
-      <p id="tv-chip" class="chip" hidden>Только телефоны</p>
       <p id="wait-note" class="wait" aria-live="polite">Ожидание запуска игры ведущим...</p>
       <div id="games" class="game-list"></div>
     </section>
@@ -61,33 +58,41 @@
     </section>
   </div>
 
-  <button id="open-host" class="fab fab-host" type="button" hidden>Пульт</button>
-  <button id="open-settings" class="fab fab-settings" type="button" hidden>Настройки</button>
+  <button id="open-host" class="fab fab-host" type="button" hidden aria-label="Пульт ведущего">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v2H4V6zm0 5h10v2H4v-2zm0 5h16v2H4v-2zm12-6h2v6h-2v-6z"/></svg>
+  </button>
+  <button id="open-rank" class="fab fab-rank" type="button" hidden aria-label="Рейтинг">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v2h3a1 1 0 0 1 1 1v2a5 5 0 0 1-4.1 4.9A5 5 0 0 1 13 16.9V19h3v2H8v-2h3v-2.1a5 5 0 0 1-3.9-3.9A5 5 0 0 1 3 8V6a1 1 0 0 1 1-1h3V3zm10 4h2v1a3 3 0 0 1-2 2.8V7zM5 7h2v3.8A3 3 0 0 1 5 8V7z"/></svg>
+  </button>
+  <button id="open-settings" class="fab fab-settings" type="button" hidden aria-label="Настройки">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.4 13a7.8 7.8 0 0 0 .1-1 7.8 7.8 0 0 0-.1-1l2.1-1.6a.5.5 0 0 0 .1-.6l-2-3.4a.5.5 0 0 0-.6-.2l-2.5 1a7 7 0 0 0-1.7-1L14.6 2a.5.5 0 0 0-.5-.4h-4.2a.5.5 0 0 0-.5.4l-.3 2.6a7 7 0 0 0-1.7 1l-2.5-1a.5.5 0 0 0-.6.2l-2 3.4a.5.5 0 0 0 .1.6L4.5 11a7.8 7.8 0 0 0 0 2l-2.1 1.6a.5.5 0 0 0-.1.6l2 3.4a.5.5 0 0 0 .6.2l2.5-1a7 7 0 0 0 1.7 1l.3 2.6a.5.5 0 0 0 .5.4h4.2a.5.5 0 0 0 .5-.4l.3-2.6a7 7 0 0 0 1.7-1l2.5 1a.5.5 0 0 0 .6-.2l2-3.4a.5.5 0 0 0-.1-.6L19.4 13zM12 15.5A3.5 3.5 0 1 1 15.5 12 3.5 3.5 0 0 1 12 15.5z"/></svg>
+  </button>
+
+  <dialog id="rank-sheet" class="sheet">
+    <h2>Рейтинг</h2>
+    <ol id="rank-list" class="player-list"></ol>
+    <button id="rank-close" class="ghost" type="button">Закрыть</button>
+  </dialog>
 
   <dialog id="player-settings" class="sheet">
-    <form id="settings-form">
-      <h2>Настройки</h2>
-      <label for="settings-nick">Имя</label>
-      <input id="settings-nick" maxlength="16" autocomplete="nickname" required>
-      <p class="label">Аватар</p>
-      <div id="settings-avatars" class="avatar-picker"></div>
-      <p id="settings-error" class="error" hidden></p>
-      <button type="submit">Сохранить</button>
-      <button id="leave-btn" class="ghost" type="button">Выйти</button>
-      <button id="settings-close" class="ghost" type="button">Закрыть</button>
-    </form>
+    <h2>Настройки</h2>
+    <label class="toggle">
+      <input id="vibrate-toggle" type="checkbox">
+      <span class="toggle-ui"></span>
+      <span>Вибрация при нажатии</span>
+    </label>
+    <button id="leave-btn" class="ghost" type="button">Выйти из игры</button>
+    <button id="settings-close" class="ghost" type="button">Закрыть</button>
   </dialog>
 
   <dialog id="host-sheet" class="sheet host-sheet">
     <h2>Пульт ведущего</h2>
-    <p class="label">Игроки</p>
-    <ul id="players" class="player-list"></ul>
     <label class="toggle">
       <input id="tv-mode" type="checkbox" checked>
       <span class="toggle-ui"></span>
       <span id="tv-mode-label">С экраном ТВ</span>
     </label>
-    <p class="label">Голоса</p>
+    <p class="label">Голоса за игры</p>
     <div id="votes" class="vote-list"></div>
     <label for="game-select">Игра к запуску</label>
     <select id="game-select"></select>

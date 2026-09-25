@@ -1,5 +1,6 @@
 const PLAYER_KEY = 'partybox_player_id';
 const TOKEN_KEY = 'partybox_admin_token';
+const VIBRATE_KEY = 'partybox_vibrate';
 const isHost = document.body.classList.contains('page-admin');
 
 const views = {};
@@ -10,13 +11,12 @@ const views = {};
 
 const socket = io();
 const settingsDialog = document.getElementById('player-settings');
+const rankDialog = document.getElementById('rank-sheet');
 const hostDialog = document.getElementById('host-sheet');
-const settingsAvatarBox = document.getElementById('settings-avatars');
 
 let room = null;
 let me = null;
 let chosen = null;
-let settingsAvatar = null;
 let avatarsDrawn = false;
 let hostAuthed = !isHost;
 let syncing = false;
@@ -27,20 +27,23 @@ function show(name) {
     views[key].hidden = key !== name;
   });
   const inRoom = name === 'lobby' || name === 'play';
-  const settingsBtn = document.getElementById('open-settings');
-  const hostBtn = document.getElementById('open-host');
-  if (settingsBtn) settingsBtn.hidden = !inRoom;
-  if (hostBtn) hostBtn.hidden = !inRoom;
+  ['open-settings', 'open-rank', 'open-host'].forEach((id) => {
+    const button = document.getElementById(id);
+    if (button) button.hidden = !inRoom;
+  });
+}
+
+function vibrationEnabled() {
+  return localStorage.getItem(VIBRATE_KEY) !== 'off';
+}
+
+function buzz(pattern) {
+  if (!vibrationEnabled() || !navigator.vibrate) return;
+  navigator.vibrate(pattern);
 }
 
 function showJoinError(message) {
   const node = document.getElementById('join-error');
-  node.hidden = !message;
-  node.textContent = message || '';
-}
-
-function showSettingsError(message) {
-  const node = document.getElementById('settings-error');
   node.hidden = !message;
   node.textContent = message || '';
 }
@@ -95,7 +98,6 @@ function renderGames() {
     button.type = 'button';
     button.disabled = room.roundStatus !== 'lobby' || me.votedGame === game.id;
     button.addEventListener('click', () => {
-      if (navigator.vibrate) navigator.vibrate(30);
       socket.emit('player_vote', { gameId: game.id });
     });
     row.appendChild(button);
@@ -107,20 +109,12 @@ function renderGames() {
 function render() {
   if (!me || !room) return;
   const fresh = room.players.find((player) => player.id === me.id);
-  if (!fresh) {
-    me = null;
-    localStorage.removeItem(PLAYER_KEY);
-    showJoinError('Вас больше нет в комнате');
-    show('join');
-    return;
-  }
-  me = fresh;
+  if (fresh) me = fresh;
 
   document.getElementById('me-avatar').textContent = me.avatar;
   document.getElementById('me-name').textContent = me.nickname;
   document.getElementById('me-score').textContent = pointsLabel(me.score);
-  const tvChip = document.getElementById('tv-chip');
-  if (tvChip) tvChip.hidden = room.tvMode;
+  renderRank();
 
   if (room.roundStatus === 'playing') {
     document.getElementById('play-title').textContent = gameTitle(room, room.activeGame);
@@ -149,34 +143,34 @@ function ensureGames(games) {
   gamesReady = true;
 }
 
-function renderHost() {
-  if (!isHost || !hostAuthed || !room || !hostDialog) return;
-  ensureGames(room.games);
-  const list = document.getElementById('players');
+function renderRank() {
+  const list = document.getElementById('rank-list');
+  if (!list || !room) return;
+  const players = room.players.slice().sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return a.nickname.localeCompare(b.nickname, 'ru');
+  });
   clearNode(list);
-  if (!room.players.length) {
-    list.appendChild(make('li', 'muted', 'Пока в комнате никого нет'));
+  if (!players.length) {
+    list.appendChild(make('li', 'muted', 'Пока никого нет'));
+    return;
   }
-  room.players.forEach((player) => {
-    const item = make('li', 'player ' + (player.isOnline ? 'online' : 'offline'));
+  players.forEach((player, index) => {
+    const item = make('li', 'player');
     const meta = make('div', 'meta');
-    const voteName = player.votedGame ? gameTitle(room, player.votedGame) : 'ещё не голосовал';
     const self = me && player.id === me.id;
     meta.append(
       make('strong', null, player.nickname + (self ? ' (вы)' : '')),
-      make('span', null, (player.isOnline ? 'в сети' : 'не в сети') + ' · ' + voteName)
+      make('span', null, pointsLabel(player.score))
     );
-    item.append(make('span', 'face', player.avatar), meta, make('span', 'status-dot'));
-    if (!self) {
-      const kick = make('button', 'kick', 'Удалить');
-      kick.type = 'button';
-      kick.addEventListener('click', () => {
-        socket.emit('admin_kick', { playerId: player.id });
-      });
-      item.appendChild(kick);
-    }
+    item.append(make('span', 'place', String(index + 1)), make('span', 'face', player.avatar), meta);
     list.appendChild(item);
   });
+}
+
+function renderHost() {
+  if (!isHost || !hostAuthed || !room || !hostDialog) return;
+  ensureGames(room.games);
 
   const votes = document.getElementById('votes');
   const max = room.games.reduce((top, game) => Math.max(top, game.votes), 0);
@@ -216,14 +210,15 @@ function renderHost() {
 }
 
 function openSettings() {
-  if (!me || !room) return;
-  document.getElementById('settings-nick').value = me.nickname;
-  settingsAvatar = me.avatar;
-  paintAvatars(settingsAvatarBox, settingsAvatar, (avatar) => {
-    settingsAvatar = avatar;
-  });
-  showSettingsError('');
+  const toggle = document.getElementById('vibrate-toggle');
+  toggle.checked = vibrationEnabled();
   if (!settingsDialog.open) settingsDialog.showModal();
+}
+
+function closeSheets() {
+  if (settingsDialog.open) settingsDialog.close();
+  if (rankDialog && rankDialog.open) rankDialog.close();
+  if (hostDialog && hostDialog.open) hostDialog.close();
 }
 
 document.getElementById('join-form').addEventListener('submit', (event) => {
@@ -239,20 +234,23 @@ document.getElementById('join-form').addEventListener('submit', (event) => {
 
 document.getElementById('open-settings').addEventListener('click', openSettings);
 document.getElementById('settings-close').addEventListener('click', () => settingsDialog.close());
+document.getElementById('vibrate-toggle').addEventListener('change', (event) => {
+  localStorage.setItem(VIBRATE_KEY, event.target.checked ? 'on' : 'off');
+});
+document.getElementById('open-rank').addEventListener('click', () => {
+  renderRank();
+  if (!rankDialog.open) rankDialog.showModal();
+});
+document.getElementById('rank-close').addEventListener('click', () => rankDialog.close());
 
-document.getElementById('settings-form').addEventListener('submit', (event) => {
-  event.preventDefault();
-  const nickname = document.getElementById('settings-nick').value.trim();
-  if (nickname.length < 2) {
-    showSettingsError('Имя должно быть от 2 до 16 символов');
-    return;
-  }
-  showSettingsError('');
-  socket.emit('player_update', { nickname, avatar: settingsAvatar });
+document.addEventListener('click', (event) => {
+  const button = event.target.closest('button');
+  if (!button || button.disabled) return;
+  buzz(20);
 });
 
 document.getElementById('leave-btn').addEventListener('click', () => {
-  if (!window.confirm('Выйти из комнаты?')) return;
+  if (!window.confirm('Вы уверены?')) return;
   socket.emit('player_leave');
 });
 
@@ -312,51 +310,49 @@ socket.on('votes_updated', (data) => {
 
 socket.on('player_ready', ({ player }) => {
   me = player;
-  localStorage.setItem(PLAYER_KEY, player.id);
-  if (settingsDialog.open) settingsDialog.close();
+  if (!isHost) localStorage.setItem(PLAYER_KEY, player.id);
   render();
   if (!room || room.roundStatus !== 'playing') show('lobby');
 });
 
 socket.on('player_unknown', () => {
-  localStorage.removeItem(PLAYER_KEY);
   me = null;
+  if (!isHost) localStorage.removeItem(PLAYER_KEY);
   if (!isHost || hostAuthed) show('join');
 });
 
 socket.on('player_left', () => {
   me = null;
-  localStorage.removeItem(PLAYER_KEY);
-  if (settingsDialog.open) settingsDialog.close();
+  if (!isHost) localStorage.removeItem(PLAYER_KEY);
+  closeSheets();
   showJoinError('');
   show('join');
 });
 
 socket.on('player_kicked', () => {
   me = null;
-  localStorage.removeItem(PLAYER_KEY);
-  if (settingsDialog.open) settingsDialog.close();
-  if (hostDialog && hostDialog.open) hostDialog.close();
+  if (!isHost) localStorage.removeItem(PLAYER_KEY);
+  closeSheets();
   showJoinError('Ведущий удалил вас из комнаты');
   show('join');
 });
 
 socket.on('player_rejected', ({ message }) => {
   if (views.join && !views.join.hidden) showJoinError(message);
-  if (settingsDialog.open) showSettingsError(message);
 });
 
 socket.on('game_start', () => {
-  if (navigator.vibrate) navigator.vibrate([40, 40, 40]);
+  buzz([40, 40, 40]);
 });
 
 if (isHost) {
-  socket.on('admin_ok', ({ token }) => {
+  socket.on('admin_ok', ({ token, playerId }) => {
     localStorage.setItem(TOKEN_KEY, token);
     hostAuthed = true;
     const password = document.getElementById('password');
     if (password) password.value = '';
-    resumePlayer();
+    if (playerId) return;
+    if (!me) show('join');
   });
 
   socket.on('admin_fail', ({ message }) => {

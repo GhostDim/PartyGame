@@ -48,6 +48,21 @@ function votesUpdated() {
   });
 }
 
+function bindAdmin(socket, token) {
+  socket.data.isAdmin = true;
+  socket.data.adminToken = token;
+  const host = state.hostPlayer();
+  let player = null;
+  if (host) {
+    state.linkAdminPlayer(token, host.id);
+    socket.data.playerId = host.id;
+    player = state.attach(host.id, socket.id);
+  }
+  socket.emit('admin_ok', { token, playerId: player ? player.id : null });
+  if (player) socket.emit('player_ready', { player });
+  broadcast();
+}
+
 function requireAdmin(socket) {
   if (socket.data.isAdmin) return true;
   socket.emit('admin_denied');
@@ -84,10 +99,8 @@ io.on('connection', (socket) => {
       return;
     }
     loginGuard.delete(socket.id);
-    socket.data.isAdmin = true;
     const token = state.createAdminToken();
-    socket.emit('admin_ok', { token });
-    socket.emit('room_state', state.snapshot());
+    bindAdmin(socket, token);
   });
 
   socket.on('admin_resume', (payload) => {
@@ -96,9 +109,7 @@ io.on('connection', (socket) => {
       socket.emit('admin_fail', { message: 'Сессия истекла, войдите снова' });
       return;
     }
-    socket.data.isAdmin = true;
-    socket.emit('admin_ok', { token });
-    socket.emit('room_state', state.snapshot());
+    bindAdmin(socket, token);
   });
 
   socket.on('set_tv_mode', (payload) => {
@@ -141,18 +152,38 @@ io.on('connection', (socket) => {
   });
 
   socket.on('player_register', (payload) => {
+    const data = payload || {};
+    if (socket.data.isAdmin) {
+      const host = state.hostPlayer();
+      if (host) {
+        const updated = state.updateProfile(host.id, data);
+        if (!updated.ok) {
+          socket.emit('player_rejected', { message: updated.error });
+          return;
+        }
+        if (socket.data.adminToken) state.linkAdminPlayer(socket.data.adminToken, host.id);
+        socket.data.playerId = host.id;
+        const player = state.attach(host.id, socket.id);
+        socket.emit('player_ready', { player });
+        broadcast();
+        return;
+      }
+    }
     if (socket.data.playerId && state.players.has(socket.data.playerId)) {
       const current = state.attach(socket.data.playerId, socket.id);
       socket.emit('player_ready', { player: current });
       broadcast();
       return;
     }
-    const result = state.register(payload || {});
+    const result = state.register(data);
     if (!result.ok) {
       socket.emit('player_rejected', { message: result.error });
       return;
     }
     socket.data.playerId = result.player.id;
+    if (socket.data.isAdmin && socket.data.adminToken) {
+      state.linkAdminPlayer(socket.data.adminToken, result.player.id);
+    }
     const player = state.attach(result.player.id, socket.id);
     socket.emit('player_ready', { player });
     broadcast();
@@ -198,7 +229,7 @@ io.on('connection', (socket) => {
       socket.emit('admin_notice', { message: 'Себя уберите через «Выйти» в настройках' });
       return;
     }
-    const result = state.remove(playerId);
+    const result = state.kick(playerId);
     if (!result.ok) {
       socket.emit('admin_notice', { message: result.error });
       return;
