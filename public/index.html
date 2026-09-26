@@ -64,7 +64,16 @@
       <span class="toggle-ui"></span>
       <span>Вибрация при нажатии</span>
     </label>
-    <button id="leave-btn" class="ghost" type="button">Выйти из игры</button>
+    <p id="vibrate-hint" class="muted" hidden></p>
+    <button id="leave-btn" class="danger" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5v-2H5V5h5V3zm4.3 4.3 1.4 1.4L13.4 11H21v2h-7.6l2.3 2.3-1.4 1.4L9.6 12l4.7-4.7z"/></svg>
+      Выйти из игры
+    </button>
+    <div id="leave-confirm" hidden>
+      <p class="wait">Забыть это устройство и выйти? Войти можно будет заново.</p>
+      <button id="leave-yes" class="danger" type="button">Да, выйти</button>
+      <button id="leave-no" class="ghost" type="button">Остаться</button>
+    </div>
     <button id="settings-close" class="ghost" type="button">Закрыть</button>
   </dialog>
   <script src="/socket.io/socket.io.js"></script>

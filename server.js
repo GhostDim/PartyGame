@@ -146,6 +146,16 @@ io.on('connection', (socket) => {
     broadcast();
   });
 
+  socket.on('return_to_lobby', () => {
+    if (!requireAdmin(socket)) return;
+    const result = state.returnToLobby();
+    if (!result.ok) {
+      socket.emit('admin_notice', { message: result.error });
+      return;
+    }
+    broadcast();
+  });
+
   socket.on('tv_hello', () => {
     socket.data.role = 'tv';
     socket.emit('room_state', state.snapshot());

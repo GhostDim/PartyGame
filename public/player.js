@@ -17,7 +17,7 @@ const hostDialog = document.getElementById('host-sheet');
 let room = null;
 let me = null;
 let chosen = null;
-let avatarsDrawn = false;
+let seenStatus = null;
 let hostAuthed = !isHost;
 let syncing = false;
 let gamesReady = false;
@@ -37,9 +37,31 @@ function vibrationEnabled() {
   return localStorage.getItem(VIBRATE_KEY) !== 'off';
 }
 
-function buzz(pattern) {
-  if (!vibrationEnabled() || !navigator.vibrate) return;
-  navigator.vibrate(pattern);
+let buzzAt = 0;
+
+function buzz(pattern, force) {
+  if (!force && !vibrationEnabled()) return;
+  if (typeof navigator.vibrate !== 'function') return;
+  const now = Date.now();
+  if (now - buzzAt < 50) return;
+  buzzAt = now;
+  navigator.vibrate(pattern || 50);
+}
+
+function pressControl(event) {
+  const raw = event.target;
+  const node = raw && raw.closest ? raw : raw && raw.parentElement;
+  if (!node || !node.closest) return null;
+  return node.closest('button, .toggle');
+}
+
+function onPress(event) {
+  const control = pressControl(event);
+  if (!control) return;
+  if (control.matches('button') && control.disabled) return;
+  const toggle = document.getElementById('vibrate-toggle');
+  const turningOn = !!(toggle && control.contains(toggle) && !toggle.checked);
+  buzz(50, turningOn);
 }
 
 function showJoinError(message) {
@@ -48,14 +70,29 @@ function showJoinError(message) {
   node.textContent = message || '';
 }
 
+function takenAvatars() {
+  const taken = new Set();
+  if (!room || !room.players) return taken;
+  room.players.forEach((player) => {
+    if (me && player.id === me.id) return;
+    taken.add(player.avatar);
+  });
+  return taken;
+}
+
 function paintAvatars(box, current, onPick) {
   clearNode(box);
   if (!room || !room.avatars) return;
+  const taken = takenAvatars();
   room.avatars.forEach((avatar) => {
+    const busy = taken.has(avatar);
     const button = make('button', 'avatar-option', avatar);
     button.type = 'button';
-    button.setAttribute('aria-pressed', avatar === current ? 'true' : 'false');
+    button.disabled = busy;
+    if (busy) button.title = 'Занято';
+    button.setAttribute('aria-pressed', !busy && avatar === current ? 'true' : 'false');
     button.addEventListener('click', () => {
+      if (button.disabled) return;
       box.querySelectorAll('.avatar-option').forEach((item) => {
         item.setAttribute('aria-pressed', item === button ? 'true' : 'false');
       });
@@ -65,15 +102,30 @@ function paintAvatars(box, current, onPick) {
   });
 }
 
-function drawJoinAvatars() {
-  if (avatarsDrawn || !room || !room.avatars || !room.avatars.length) return;
+function syncJoinAvatars() {
   const box = document.getElementById('avatars');
-  if (!box) return;
-  chosen = room.avatars[0];
+  if (!box || !room || !room.avatars || !room.avatars.length) return;
+  const taken = takenAvatars();
+  if (!chosen || taken.has(chosen) || !room.avatars.includes(chosen)) {
+    chosen = room.avatars.find((avatar) => !taken.has(avatar)) || null;
+  }
   paintAvatars(box, chosen, (avatar) => {
     chosen = avatar;
   });
-  avatarsDrawn = true;
+  const submit = document.querySelector('#join-form button[type="submit"]');
+  if (submit) submit.disabled = !chosen;
+  const onJoin = views.join && !views.join.hidden;
+  const error = document.getElementById('join-error');
+  if (!onJoin || !error) return;
+  if (!chosen) {
+    if (error.hidden || error.textContent === 'Все аватары заняты') {
+      showJoinError('Все аватары заняты');
+    }
+    return;
+  }
+  if (error.textContent === 'Все аватары заняты' || error.textContent === 'Этот аватар уже занят') {
+    showJoinError('');
+  }
 }
 
 function resumePlayer() {
@@ -115,6 +167,9 @@ function render() {
   document.getElementById('me-name').textContent = me.nickname;
   document.getElementById('me-score').textContent = pointsLabel(me.score);
   renderRank();
+
+  if (seenStatus === 'playing' && room.roundStatus === 'lobby') buzz([40, 30, 40]);
+  seenStatus = room.roundStatus;
 
   if (room.roundStatus === 'playing') {
     document.getElementById('play-title').textContent = gameTitle(room, room.activeGame);
@@ -195,6 +250,14 @@ function renderHost() {
   syncing = false;
 
   const hint = document.getElementById('start-hint');
+  const abort = document.getElementById('abort');
+  const abortBox = document.getElementById('abort-confirm');
+  if (room.roundStatus !== 'playing') {
+    if (abort) abort.hidden = true;
+    if (abortBox) abortBox.hidden = true;
+  } else if (abort && abortBox && abortBox.hidden) {
+    abort.hidden = false;
+  }
   if (room.roundStatus === 'playing') {
     hint.textContent = 'Идёт: ' + gameTitle(room, room.activeGame);
     startButton.disabled = true;
@@ -209,9 +272,18 @@ function renderHost() {
   startButton.disabled = false;
 }
 
+function resetLeaveConfirm() {
+  document.getElementById('leave-btn').hidden = false;
+  document.getElementById('leave-confirm').hidden = true;
+}
+
 function openSettings() {
   const toggle = document.getElementById('vibrate-toggle');
+  const hint = document.getElementById('vibrate-hint');
   toggle.checked = vibrationEnabled();
+  hint.hidden = typeof navigator.vibrate === 'function';
+  hint.textContent = 'Этот браузер не разрешает вибрацию для страницы.';
+  resetLeaveConfirm();
   if (!settingsDialog.open) settingsDialog.showModal();
 }
 
@@ -226,6 +298,10 @@ document.getElementById('join-form').addEventListener('submit', (event) => {
   const nickname = document.getElementById('nick').value.trim();
   if (nickname.length < 2) {
     showJoinError('Имя должно быть от 2 до 16 символов');
+    return;
+  }
+  if (!chosen) {
+    showJoinError('Все аватары заняты');
     return;
   }
   showJoinError('');
@@ -243,14 +319,15 @@ document.getElementById('open-rank').addEventListener('click', () => {
 });
 document.getElementById('rank-close').addEventListener('click', () => rankDialog.close());
 
-document.addEventListener('click', (event) => {
-  const button = event.target.closest('button');
-  if (!button || button.disabled) return;
-  buzz(20);
-});
+document.addEventListener('pointerdown', onPress, true);
+document.addEventListener('touchstart', onPress, { capture: true, passive: true });
 
 document.getElementById('leave-btn').addEventListener('click', () => {
-  if (!window.confirm('Вы уверены?')) return;
+  document.getElementById('leave-btn').hidden = true;
+  document.getElementById('leave-confirm').hidden = false;
+});
+document.getElementById('leave-no').addEventListener('click', resetLeaveConfirm);
+document.getElementById('leave-yes').addEventListener('click', () => {
   socket.emit('player_leave');
 });
 
@@ -276,6 +353,19 @@ if (isHost) {
   document.getElementById('start').addEventListener('click', () => {
     socket.emit('start_game');
   });
+  document.getElementById('abort').addEventListener('click', () => {
+    document.getElementById('abort').hidden = true;
+    document.getElementById('abort-confirm').hidden = false;
+  });
+  document.getElementById('abort-no').addEventListener('click', () => {
+    document.getElementById('abort-confirm').hidden = true;
+    document.getElementById('abort').hidden = room && room.roundStatus !== 'playing';
+  });
+  document.getElementById('abort-yes').addEventListener('click', () => {
+    document.getElementById('abort-confirm').hidden = true;
+    document.getElementById('abort').hidden = true;
+    socket.emit('return_to_lobby');
+  });
 }
 
 socket.on('connect', () => {
@@ -295,7 +385,7 @@ socket.on('disconnect', () => {
 
 socket.on('room_state', (next) => {
   room = next;
-  drawJoinAvatars();
+  syncJoinAvatars();
   if (me || (settingsDialog && settingsDialog.open)) render();
   else renderHost();
 });
@@ -341,8 +431,13 @@ socket.on('player_rejected', ({ message }) => {
   if (views.join && !views.join.hidden) showJoinError(message);
 });
 
-socket.on('game_start', () => {
-  buzz([40, 40, 40]);
+socket.on('game_start', (payload) => {
+  buzz([50, 40, 50]);
+  if (hostDialog && hostDialog.open) hostDialog.close();
+  if (!me) return;
+  seenStatus = 'playing';
+  document.getElementById('play-title').textContent = (payload && payload.title) || 'Игра началась';
+  show('play');
 });
 
 if (isHost) {
@@ -377,5 +472,10 @@ if (isHost) {
   socket.on('admin_notice', ({ message }) => {
     const hint = document.getElementById('start-hint');
     if (hint) hint.textContent = message;
+    const abort = document.getElementById('abort');
+    const abortBox = document.getElementById('abort-confirm');
+    if (abort && abortBox && room && room.roundStatus === 'playing' && abortBox.hidden) {
+      abort.hidden = false;
+    }
   });
 }

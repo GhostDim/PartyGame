@@ -6,7 +6,11 @@ function renderGuests(players) {
   clearNode(list);
   players.filter((player) => player.isOnline).forEach((player) => {
     const item = make('li', 'guest');
-    item.append(make('span', 'face', player.avatar), make('span', 'name', player.nickname));
+    item.append(
+      make('span', 'face', player.avatar),
+      make('span', 'name', player.nickname),
+      make('span', 'score', pointsLabel(player.score))
+    );
     list.appendChild(item);
   });
 }
