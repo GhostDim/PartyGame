@@ -20,7 +20,9 @@ let chosen = null;
 let seenStatus = null;
 let hostAuthed = !isHost;
 let syncing = false;
+let lightsSync = false;
 let gamesReady = false;
+let lights = { enabled: true, brightness: 5, hardware: 'wait' };
 
 function show(name) {
   Object.keys(views).forEach((key) => {
@@ -277,12 +279,33 @@ function resetLeaveConfirm() {
   document.getElementById('leave-confirm').hidden = true;
 }
 
+function renderLights() {
+  const toggle = document.getElementById('lights-toggle');
+  const slider = document.getElementById('lights-brightness');
+  const level = document.getElementById('lights-level');
+  const hint = document.getElementById('lights-hint');
+  if (!toggle || !slider || !level) return;
+  lightsSync = true;
+  toggle.checked = !!lights.enabled;
+  slider.disabled = !lights.enabled;
+  if (document.activeElement !== slider) {
+    slider.value = String(lights.brightness);
+    level.textContent = lights.brightness + '%';
+  }
+  if (hint) {
+    hint.hidden = lights.hardware !== 'off';
+    hint.textContent = 'Нет доступа к ленте. Настройка сохранится, светодиоды не горят.';
+  }
+  lightsSync = false;
+}
+
 function openSettings() {
   const toggle = document.getElementById('vibrate-toggle');
   const hint = document.getElementById('vibrate-hint');
   toggle.checked = vibrationEnabled();
   hint.hidden = typeof navigator.vibrate === 'function';
   hint.textContent = 'Этот браузер не разрешает вибрацию для страницы.';
+  renderLights();
   resetLeaveConfirm();
   if (!settingsDialog.open) settingsDialog.showModal();
 }
@@ -366,6 +389,31 @@ if (isHost) {
     document.getElementById('abort').hidden = true;
     socket.emit('return_to_lobby');
   });
+
+  const lightsToggle = document.getElementById('lights-toggle');
+  const lightsSlider = document.getElementById('lights-brightness');
+  let lightsTimer = null;
+  if (lightsToggle && lightsSlider) {
+    lightsToggle.addEventListener('change', () => {
+      if (lightsSync) return;
+      lightsSlider.disabled = !lightsToggle.checked;
+      socket.emit('set_lights', { enabled: lightsToggle.checked });
+    });
+    lightsSlider.addEventListener('input', () => {
+      if (lightsSync) return;
+      const brightness = Number(lightsSlider.value);
+      document.getElementById('lights-level').textContent = brightness + '%';
+      clearTimeout(lightsTimer);
+      lightsTimer = setTimeout(() => {
+        socket.emit('set_lights', { brightness });
+      }, 80);
+    });
+    lightsSlider.addEventListener('change', () => {
+      if (lightsSync) return;
+      clearTimeout(lightsTimer);
+      socket.emit('set_lights', { brightness: Number(lightsSlider.value) });
+    });
+  }
 }
 
 socket.on('connect', () => {
@@ -440,7 +488,32 @@ socket.on('game_start', (payload) => {
   show('play');
 });
 
+function hideBoard() {
+  const board = document.getElementById('board');
+  if (board) board.hidden = true;
+}
+
+function renderBoard(stats) {
+  const board = document.getElementById('board');
+  if (!board || !stats) return;
+  const temp = document.getElementById('board-temp');
+  const cpu = document.getElementById('board-cpu');
+  const mem = document.getElementById('board-mem');
+  temp.textContent = stats.tempC == null ? '—' : stats.tempC + '°C';
+  temp.classList.toggle('is-hot', typeof stats.tempC === 'number' && stats.tempC >= 70);
+  cpu.textContent = stats.cpu == null ? '—' : stats.cpu + '%';
+  mem.textContent = stats.mem == null ? '—' : stats.mem + '%';
+  board.hidden = false;
+}
+
 if (isHost) {
+  socket.on('board_stats', renderBoard);
+  socket.on('lights_state', (next) => {
+    if (!next) return;
+    lights = next;
+    renderLights();
+  });
+
   socket.on('admin_ok', ({ token, playerId }) => {
     localStorage.setItem(TOKEN_KEY, token);
     hostAuthed = true;
@@ -453,6 +526,7 @@ if (isHost) {
   socket.on('admin_fail', ({ message }) => {
     localStorage.removeItem(TOKEN_KEY);
     hostAuthed = false;
+    hideBoard();
     const error = document.getElementById('login-error');
     error.hidden = !message;
     error.textContent = message || '';
@@ -462,6 +536,7 @@ if (isHost) {
   socket.on('admin_denied', () => {
     localStorage.removeItem(TOKEN_KEY);
     hostAuthed = false;
+    hideBoard();
     if (hostDialog && hostDialog.open) hostDialog.close();
     show('login');
     const error = document.getElementById('login-error');

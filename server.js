@@ -3,6 +3,8 @@ const path = require('path');
 const express = require('express');
 const { Server } = require('socket.io');
 const { GameStateManager } = require('./lib/gameState');
+const { sampleBoard } = require('./lib/boardStats');
+const { Lights } = require('./lib/lights');
 
 const PORT = 3000;
 const ADMIN_PASSWORD = 'admin';
@@ -10,7 +12,9 @@ const LOGIN_LIMIT = 8;
 const LOGIN_LOCK_MS = 15000;
 
 const state = new GameStateManager();
+const lights = new Lights();
 const loginGuard = new Map();
+let lastBoard = sampleBoard();
 
 const app = express();
 app.disable('x-powered-by');
@@ -59,8 +63,24 @@ function bindAdmin(socket, token) {
     player = state.attach(host.id, socket.id);
   }
   socket.emit('admin_ok', { token, playerId: player ? player.id : null });
+  socket.emit('board_stats', lastBoard);
+  socket.emit('lights_state', lights.snapshot());
   if (player) socket.emit('player_ready', { player });
   broadcast();
+}
+
+function pushBoard() {
+  lastBoard = sampleBoard();
+  for (const socket of io.sockets.sockets.values()) {
+    if (socket.data.isAdmin) socket.emit('board_stats', lastBoard);
+  }
+}
+
+function emitLights() {
+  const snap = lights.snapshot();
+  for (const socket of io.sockets.sockets.values()) {
+    if (socket.data.isAdmin) socket.emit('lights_state', snap);
+  }
 }
 
 function requireAdmin(socket) {
@@ -122,6 +142,14 @@ io.on('connection', (socket) => {
     broadcast();
   });
 
+  socket.on('set_lights', (payload) => {
+    if (!requireAdmin(socket)) return;
+    const result = lights.apply(payload);
+    if (!result.ok) {
+      socket.emit('admin_notice', { message: result.error });
+    }
+  });
+
   socket.on('select_game', (payload) => {
     if (!requireAdmin(socket)) return;
     const result = state.selectGame(payload && payload.gameId);
@@ -139,6 +167,7 @@ io.on('connection', (socket) => {
       socket.emit('admin_notice', { message: result.error });
       return;
     }
+    lights.setMode('playing');
     io.emit('game_start', {
       gameId: result.game.id,
       title: result.game.title,
@@ -153,6 +182,7 @@ io.on('connection', (socket) => {
       socket.emit('admin_notice', { message: result.error });
       return;
     }
+    lights.setMode('lobby');
     broadcast();
   });
 
@@ -271,6 +301,24 @@ io.on('connection', (socket) => {
     if (player) broadcast();
   });
 });
+
+setInterval(pushBoard, 3000).unref();
+
+let closing = false;
+
+function shutdown() {
+  if (closing) return;
+  closing = true;
+  lights.stop();
+  setTimeout(() => process.exit(0), 300).unref();
+}
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
+process.on('SIGHUP', shutdown);
+
+lights.onChange(emitLights);
+lights.start();
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`PartyBox слушает порт ${PORT}`);

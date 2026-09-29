@@ -1,74 +1,99 @@
 Плата
 
-&#x09;Плата: Rasberry Pi Zero 2W
-&#x09;host: PartyBox
-&#x09;user: gost
-&#x09;password: gost
-&#x09;ssid: server Pentagona
-&#x09;wi-fi-pass: EDA8HD6D6J
+```
+Плата: Rasberry Pi Zero 2W
+host: PartyBox
+user: gost
+password: gost
+ssid: server Pentagona
+wi-fi-pass: EDA8HD6D6J
+```
 
 Компоненты
 
-&#x09;Усилитель аудио (с динамиком) - MAX98357A
-&#x09;Бустер 5.15V - MT3608
-&#x09;Зарядка -
-&#x09;Аккумулятор - 18650 2шт.
+```
+Усилитель аудио (с динамиком) - MAX98357A
+Бустер 5.15V - MT3608
+Зарядка -
+Аккумулятор - 18650 2шт.
+Адресная RGB - WS2812B 60LED/m 5V IP20
+```
 
 Команды
 
-&#x09;ping PartyBox.local
-&#x09;ssh gost@PartyBox.local
-&#x09;sudo reboot
-&#x09;sudo poweroff
+```
+пщые
+ъ
+ssh gost@PartyBox.local
+sudo reboot
+sudo poweroff
+```
 
 Сброс ssh при ошибке:
 
-&#x09;ssh-keygen -R PartyBox.local
+```
+ssh-keygen -R PartyBox.local
+```
 
 Заливка проекта:
 
-&#x09;scp -r "C:\\Users\\Dmitriy\\Desktop\\Проекты\\PartyBox\\ProjectPartyBox\\\*" gost@PartyBox.local:\~/PartyBox/
+```
+scp -r "C:\\Users\\Dmitriy\\Desktop\\Проекты\\PartyBox\\ProjectPartyBox\\\*" gost@PartyBox.local:\~/PartyBox/
+```
 
 Запуск сервера (ПЕРЕНЕСИ В АВТОЗАПУСК)
 
-&#x09;node server.js
+```
+node server.js
+```
 
 Выключить
 
-&#x09;sudo poweroff
+```
+sudo poweroff
+```
 
 ---
 
-Что подключено\\настроено на плате:
+Что подключенонастроено на плате:
 
-1\. Автоматическая регенерация поврежденных ключей SSH
+1 Автоматическая регенерация поврежденных ключей SSH
 
 Выполните команду активации встроенного генератора ключей:
 
-&#x09;sudo systemctl enable ssh-keygen.target 2>/dev/null || sudo ssh-keygen -A
+```
+sudo systemctl enable ssh-keygen.target 2>/dev/null || sudo ssh-keygen -A
+```
 
 Убедитесь, что сам демон SSH включен в автозагрузку:
 
-&#x09;sudo systemctl enable ssh
+```
+sudo systemctl enable ssh
+```
 
-2\. Кнопка питания - Pin 5, Pin 6
+2 Кнопка питания - Pin 5, Pin 6
 
 Активируйте обработку кнопки в системе:
 
-&#x09;nano /boot/firmware/config.txtн
+```
+nano /boot/firmware/config.txtн
+```
 
 В самый конец файла добавить строку:
 
-&#x09;dtoverlay=gpio-shutdown,gpio\_pin=3
+```
+dtoverlay=gpio-shutdown,gpio\_pin=3
+```
 
+3 Увеличение подкачки до 1Гб
 
-3\. Увеличение подкачки до 1Гб
-
-&#x09;sudo fallocate -l 1G /swapfile
-&#x09;sudo chmod 600 /swapfile
-&#x09;sudo mkswap /swapfile
-&#x09;sudo swapon /swapfile
-&#x09;echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
+sudo fallocate -l 1G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
 
 Критерий успеха: команда free -m показывает в строке Swap около 1024 МБ.
 
@@ -76,11 +101,12 @@
 
 Установки для игры:
 
-1\. Node.js
+1 Node.js
 
-&#x09;sudo apt update \&\& sudo apt install -y nodejs npm
+```
+sudo apt update \&\& sudo apt install -y nodejs npm
 
-&#x09;mkdir -p \~/PartyBox
+mkdir -p \~/PartyBox
+```
 
 Критерий успеха: команды node -v и npm -v выводят установленные версии.
-

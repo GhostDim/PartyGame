@@ -1,14 +1,24 @@
 :root {
-  --bg: #100d16;
-  --card: #1b1626;
-  --line: #322844;
-  --text: #f6f2ff;
-  --muted: #b7adc8;
-  --pink: #ff3d7f;
-  --mint: #3ee0c5;
-  --amber: #ffb020;
-  --online: #3ee07a;
-  --offline: #6b6280;
+  --bg: #fbf4ec;
+  --glow: #f8dccb;
+  --card: #fffaf6;
+  --surface: #fff1e6;
+  --line: #edd9cc;
+  --text: #5c4336;
+  --muted: #9a8072;
+  --pink: #e4b0a6;
+  --pink-ink: #5c342f;
+  --mint: #6f947c;
+  --clay: #c17b6e;
+  --amber: #f0c27a;
+  --amber-ink: #5c3d1e;
+  --gold: #a86b32;
+  --online: #6d9a74;
+  --offline: #c4b2a6;
+  --danger: #f0c2be;
+  --danger-ink: #6e3434;
+  --error: #b85c56;
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
@@ -21,7 +31,7 @@ body {
   font-family: system-ui, "Segoe UI", sans-serif;
   color: var(--text);
   background:
-    radial-gradient(900px 420px at 50% -10%, #2a1848 0%, transparent 60%),
+    radial-gradient(900px 420px at 50% -10%, var(--glow) 0%, transparent 62%),
     var(--bg);
 }
 
@@ -30,7 +40,7 @@ button, input, select { font: inherit; touch-action: manipulation; }
 button:focus-visible,
 input:focus-visible,
 select:focus-visible {
-  outline: 2px solid var(--mint);
+  outline: 2px solid var(--clay);
   outline-offset: 2px;
 }
 
@@ -43,8 +53,38 @@ select:focus-visible {
   padding: 8px 12px;
   text-align: center;
   background: var(--amber);
-  color: #2a1600;
+  color: var(--amber-ink);
 }
+
+.board {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 0;
+  padding: 10px 16px;
+  background: rgba(251, 244, 236, 0.94);
+  border-bottom: 1px solid var(--line);
+}
+
+.board p { margin: 0; text-align: center; }
+
+.board span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.board strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.board .is-hot { color: var(--error); }
 
 .wrap {
   width: min(100%, 440px);
@@ -61,12 +101,12 @@ select:focus-visible {
   border: 1px solid var(--line);
   border-radius: 20px;
   padding: 22px 18px 18px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 16px 40px rgba(120, 72, 48, 0.08);
 }
 
 .brand {
   margin: 0 0 6px;
-  color: var(--mint);
+  color: var(--clay);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -92,11 +132,29 @@ input, select {
   min-height: 48px;
   padding: 0 14px;
   color: inherit;
-  background: #120e1a;
-  border: 1px solid #3a3150;
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: 12px;
   font-size: 16px;
 }
+
+input[type="range"] {
+  height: 32px;
+  min-height: 32px;
+  margin: 0 0 8px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  accent-color: var(--gold);
+  cursor: pointer;
+}
+
+input[type="range"]:disabled { opacity: 0.45; cursor: default; }
+
+#lights-level { color: var(--text); font-weight: 700; }
+
+#lights-hint { margin: 0 0 12px; font-size: 14px; }
 
 button {
   border: 0;
@@ -111,7 +169,7 @@ form button[type="submit"] {
   width: 100%;
   min-height: 52px;
   margin-top: 16px;
-  color: #fff;
+  color: var(--pink-ink);
   background: var(--pink);
   font-size: 18px;
   font-weight: 700;
@@ -124,13 +182,13 @@ button.go {
   width: 100%;
   min-height: 52px;
   margin-top: 8px;
-  color: #2a1600;
+  color: var(--amber-ink);
   background: var(--amber);
   font-size: 18px;
   font-weight: 700;
 }
 
-.error { color: #ff8aa8; min-height: 1.2em; }
+.error { color: var(--error); min-height: 1.2em; }
 
 .avatar-picker {
   display: grid;
@@ -141,14 +199,14 @@ button.go {
 .avatar-option {
   min-height: 52px;
   font-size: 28px;
-  background: #120e1a;
-  border: 1px solid #3a3150;
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: 12px;
 }
 
 .avatar-option[aria-pressed="true"] {
-  border-color: var(--mint);
-  box-shadow: inset 0 0 0 1px var(--mint);
+  border-color: var(--clay);
+  box-shadow: inset 0 0 0 1px var(--clay);
 }
 
 .avatar-option:disabled {
@@ -170,8 +228,8 @@ button.go {
   margin-bottom: 12px;
   padding: 4px 10px;
   border-radius: 99px;
-  background: #2a2140;
-  color: var(--mint);
+  background: #f6e4dc;
+  color: var(--clay);
   font-size: 13px;
 }
 
@@ -179,12 +237,12 @@ button.go {
 
 .game-card {
   padding: 14px;
-  background: #120e1a;
-  border: 1px solid #3a3150;
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: 16px;
 }
 
-.game-card.is-picked { border-color: var(--amber); }
+.game-card.is-picked { border-color: var(--gold); }
 
 .game-card p { margin: 6px 0 10px; color: var(--muted); font-size: 14px; }
 
@@ -198,7 +256,7 @@ button.go {
 .game-card button {
   min-height: 44px;
   padding: 0 14px;
-  color: #fff;
+  color: var(--pink-ink);
   background: var(--pink);
   font-weight: 700;
 }
@@ -207,7 +265,7 @@ button.go {
   height: 10px;
   margin-bottom: 10px;
   overflow: hidden;
-  background: #2a2438;
+  background: #f0e0d4;
   border-radius: 99px;
 }
 
@@ -215,7 +273,7 @@ button.go {
   display: block;
   height: 100%;
   width: 0;
-  background: linear-gradient(90deg, var(--pink), var(--mint));
+  background: linear-gradient(90deg, #e8b0a4, var(--amber));
 }
 
 .player-list, .vote-list { display: grid; gap: 8px; margin: 0 0 16px; padding: 0; list-style: none; }
@@ -225,7 +283,7 @@ button.go {
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  background: #120e1a;
+  background: var(--surface);
   border-radius: 14px;
 }
 
@@ -271,7 +329,7 @@ button.go {
   position: relative;
   width: 52px;
   height: 32px;
-  background: #3a3150;
+  background: #ead8cc;
   border-radius: 99px;
 }
 
@@ -300,8 +358,8 @@ button.go {
   margin: 0 0 16px;
   padding: 10px 14px;
   border-radius: 12px;
-  background: #3a2a12;
-  color: var(--amber);
+  background: #f8e6cc;
+  color: var(--amber-ink);
 }
 
 .guest-grid {
@@ -319,6 +377,7 @@ button.go {
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: 18px;
+  box-shadow: 0 8px 24px rgba(120, 72, 48, 0.06);
 }
 
 .guest .face { display: block; font-size: 56px; line-height: 1.1; }
@@ -333,7 +392,7 @@ button.go {
 
 .tv-bar .bar { height: 22px; }
 
-.tv-bar.is-picked h2 { color: var(--amber); }
+.tv-bar.is-picked h2 { color: var(--gold); }
 
 .is-waiting { animation: pulse 1.6s ease-in-out infinite; }
 
@@ -351,18 +410,19 @@ button.go {
   height: 52px;
   padding: 0;
   color: var(--text);
-  background: #2a2140;
+  background: var(--card);
   border: 1px solid var(--line);
   border-radius: 16px;
+  box-shadow: 0 8px 20px rgba(120, 72, 48, 0.1);
 }
 
 .fab svg { width: 26px; height: 26px; fill: currentColor; }
 
 .fab-settings { bottom: 16px; }
 
-.fab-rank { bottom: 76px; color: var(--mint); }
+.fab-rank { bottom: 76px; color: var(--clay); }
 
-.fab-host { bottom: 136px; background: #3a2a12; color: var(--amber); }
+.fab-host { bottom: 136px; background: #f8e6cc; color: var(--amber-ink); }
 
 .place {
   width: 1.4em;
@@ -380,11 +440,12 @@ dialog.sheet {
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: 20px;
+  box-shadow: 0 18px 48px rgba(120, 72, 48, 0.14);
 }
 
 dialog.host-sheet { width: min(100% - 24px, 640px); }
 
-dialog.sheet::backdrop { background: rgba(0, 0, 0, 0.55); }
+dialog.sheet::backdrop { background: rgba(92, 67, 54, 0.28); }
 
 button.ghost {
   width: 100%;
@@ -392,7 +453,7 @@ button.ghost {
   margin-top: 8px;
   color: var(--text);
   background: transparent;
-  border: 1px solid #3a3150;
+  border: 1px solid var(--line);
 }
 
 button.danger {
@@ -403,8 +464,8 @@ button.danger {
   width: 100%;
   min-height: 52px;
   margin-top: 12px;
-  color: #fff;
-  background: #c4234a;
+  color: var(--danger-ink);
+  background: var(--danger);
   font-weight: 700;
 }
 
@@ -413,9 +474,9 @@ button.danger svg { width: 22px; height: 22px; fill: currentColor; }
 button.kick {
   min-height: 36px;
   padding: 0 10px;
-  color: #ff8aa8;
+  color: var(--error);
   background: transparent;
-  border: 1px solid #ff8aa8;
+  border: 1px solid #e3b0ac;
   border-radius: 10px;
 }
 

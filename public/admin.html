@@ -3,12 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#100d16">
+  <meta name="theme-color" content="#fbf4ec">
   <title>PartyBox — ведущий</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body class="page-admin">
   <p id="conn" class="conn" hidden>Нет связи с консолью, переподключение…</p>
+  <div id="board" class="board" hidden>
+    <p><span>ЦП</span><strong id="board-temp">—</strong></p>
+    <p><span>Нагрузка</span><strong id="board-cpu">—</strong></p>
+    <p><span>Память</span><strong id="board-mem">—</strong></p>
+  </div>
   <div class="wrap">
     <section id="view-boot" class="panel">
       <p class="brand">PartyBox</p>
@@ -82,6 +87,17 @@
       <span>Вибрация при нажатии</span>
     </label>
     <p id="vibrate-hint" class="muted" hidden></p>
+    <div id="lights-settings">
+      <p class="label">Подсветка</p>
+      <label class="toggle">
+        <input id="lights-toggle" type="checkbox" checked>
+        <span class="toggle-ui"></span>
+        <span>Лента включена</span>
+      </label>
+      <label for="lights-brightness">Яркость <span id="lights-level">5%</span></label>
+      <input id="lights-brightness" type="range" min="5" max="100" step="5" value="5" aria-label="Яркость подсветки">
+      <p id="lights-hint" class="muted" hidden></p>
+    </div>
     <button id="leave-btn" class="danger" type="button">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5v-2H5V5h5V3zm4.3 4.3 1.4 1.4L13.4 11H21v2h-7.6l2.3 2.3-1.4 1.4L9.6 12l4.7-4.7z"/></svg>
       Выйти из игры
