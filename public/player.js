@@ -16,6 +16,8 @@ const hostDialog = document.getElementById('host-sheet');
 
 let room = null;
 let me = null;
+let bomb = null;
+let hostNote = '';
 let chosen = null;
 let seenStatus = null;
 let hostAuthed = !isHost;
@@ -160,6 +162,104 @@ function renderGames() {
   });
 }
 
+function setHint(text) {
+  const hint = document.getElementById('start-hint');
+  if (!hint) return;
+  if (hostNote) {
+    hint.textContent = hostNote;
+    if (hostDialog && hostDialog.open) hostNote = '';
+    return;
+  }
+  hint.textContent = text;
+}
+
+function paintPlayerBomb() {
+  const box = document.getElementById('play-bomb');
+  const generic = document.getElementById('play-generic');
+  if (!box || !generic) return;
+  const playing = !!(room && room.roundStatus === 'playing' && room.activeGame === 'hotbomb');
+  if (!playing) {
+    box.hidden = true;
+    generic.hidden = false;
+    return;
+  }
+  box.hidden = false;
+  generic.hidden = true;
+  const count = document.getElementById('bomb-count');
+  const status = document.getElementById('bomb-status');
+  const score = document.getElementById('bomb-score');
+  const pass = document.getElementById('bomb-pass');
+  const winners = document.getElementById('bomb-winners');
+  if (!bomb) {
+    count.hidden = true;
+    score.hidden = true;
+    pass.hidden = true;
+    winners.hidden = true;
+    status.textContent = 'Приготовьтесь';
+    return;
+  }
+  fillBombChain(document.getElementById('bomb-chain'), bomb);
+  const counting = bomb.phase === 'countdown';
+  const seat = seatById(bomb, me && me.id);
+  const mine = !!(me && bomb.holderId === me.id);
+  const dead = !!(seat && !seat.alive);
+  const showPass = bomb.phase === 'live' && mine;
+  count.hidden = !counting;
+  if (counting) showCount(count, bomb.count);
+  else {
+    count.textContent = '';
+    count.classList.remove('is-go');
+  }
+  pass.hidden = !showPass;
+  winners.hidden = bomb.phase !== 'over';
+  score.hidden = !(bomb.phase === 'live' && mine);
+  if (mine && !score.hidden && seat) {
+    const text = pointsLabel(seat.score);
+    if (score.textContent !== text) {
+      score.textContent = text;
+      punch(score);
+    }
+  }
+  if (bomb.phase === 'over') {
+    fillWinners(winners, bomb);
+    status.textContent = winnerLine(bomb, me);
+    return;
+  }
+  if (counting) {
+    status.textContent = 'Приготовьтесь';
+    return;
+  }
+  if (bomb.phase === 'boom') {
+    const name = nameById(bomb, bomb.boomId);
+    status.textContent = me && bomb.boomId === me.id ? 'Бах! Вы выбываете' : 'Бах! ' + (name || 'Игрок') + ' выбывает';
+    return;
+  }
+  if (dead) {
+    status.textContent = 'Вы выбыли. Бомба у ' + (holderName(bomb) || 'игрока');
+    return;
+  }
+  if (showPass) {
+    status.textContent = 'У вас бомба · +' + (bomb.perSec || 10) + '/сек';
+    return;
+  }
+  status.textContent = prepareLine(bomb);
+}
+
+function reactBomb(prev, next) {
+  if (!next) return;
+  if (next.phase === 'countdown' && next.count === 'GO' && (!prev || prev.count !== 'GO')) buzz([40, 30, 40]);
+  const gotBomb = next.phase === 'live' && me && next.holderId === me.id
+    && (!prev || prev.phase !== 'live' || prev.holderId !== me.id);
+  if (gotBomb) buzz([50, 30, 70]);
+  const exploded = prev && next.phase === 'boom' && (prev.phase !== 'boom' || prev.boomId !== next.boomId);
+  if (exploded) {
+    if (me && next.boomId === me.id) buzz([90, 50, 140, 50, 220]);
+    else buzz([30, 40, 30]);
+    flashScreen();
+  }
+  if (next.phase === 'over' && (!prev || prev.phase !== 'over')) buzz([60, 40, 60, 40, 100]);
+}
+
 function render() {
   if (!me || !room) return;
   const fresh = room.players.find((player) => player.id === me.id);
@@ -173,12 +273,16 @@ function render() {
   if (seenStatus === 'playing' && room.roundStatus === 'lobby') buzz([40, 30, 40]);
   seenStatus = room.roundStatus;
 
+  if (room.roundStatus !== 'playing') bomb = null;
   if (room.roundStatus === 'playing') {
-    document.getElementById('play-title').textContent = gameTitle(room, room.activeGame);
-    document.getElementById('play-note').textContent = room.tvMode
-      ? 'Следите за общим экраном. Кнопки раунда появятся здесь.'
-      : 'Игра идёт на телефонах. Кнопки раунда появятся здесь.';
+    if (room.activeGame !== 'hotbomb') {
+      document.getElementById('play-title').textContent = gameTitle(room, room.activeGame);
+      document.getElementById('play-note').textContent = room.tvMode
+        ? 'Следите за общим экраном. Кнопки раунда появятся здесь.'
+        : 'Игра идёт на телефонах. Кнопки раунда появятся здесь.';
+    }
     show('play');
+    paintPlayerBomb();
   } else {
     show('lobby');
     renderGames();
@@ -261,16 +365,16 @@ function renderHost() {
     abort.hidden = false;
   }
   if (room.roundStatus === 'playing') {
-    hint.textContent = 'Идёт: ' + gameTitle(room, room.activeGame);
+    setHint('Идёт: ' + gameTitle(room, room.activeGame));
     startButton.disabled = true;
     return;
   }
   if (!room.pendingGame) {
-    hint.textContent = 'Выберите игру или дождитесь голосов';
+    setHint('Выберите игру или дождитесь голосов');
     startButton.disabled = true;
     return;
   }
-  hint.textContent = 'Запустится: ' + gameTitle(room, room.pendingGame);
+  setHint('Запустится: ' + gameTitle(room, room.pendingGame));
   startButton.disabled = false;
 }
 
@@ -330,6 +434,13 @@ document.getElementById('join-form').addEventListener('submit', (event) => {
   showJoinError('');
   socket.emit('player_register', { nickname, avatar: chosen });
 });
+
+const passButton = document.getElementById('bomb-pass');
+if (passButton) {
+  passButton.addEventListener('click', () => {
+    socket.emit('player_action', { type: 'pass' });
+  });
+}
 
 document.getElementById('open-settings').addEventListener('click', openSettings);
 document.getElementById('settings-close').addEventListener('click', () => settingsDialog.close());
@@ -447,10 +558,12 @@ socket.on('votes_updated', (data) => {
 });
 
 socket.on('player_ready', ({ player }) => {
+  const was = me;
   me = player;
   if (!isHost) localStorage.setItem(PLAYER_KEY, player.id);
   render();
   if (!room || room.roundStatus !== 'playing') show('lobby');
+  if (!was && bomb && bomb.phase === 'live' && bomb.holderId === player.id) buzz([50, 30, 70]);
 });
 
 socket.on('player_unknown', () => {
@@ -484,8 +597,25 @@ socket.on('game_start', (payload) => {
   if (hostDialog && hostDialog.open) hostDialog.close();
   if (!me) return;
   seenStatus = 'playing';
+  if (payload && payload.gameId === 'hotbomb') {
+    if (room) {
+      room.roundStatus = 'playing';
+      room.activeGame = 'hotbomb';
+    }
+    show('play');
+    paintPlayerBomb();
+    return;
+  }
   document.getElementById('play-title').textContent = (payload && payload.title) || 'Игра началась';
   show('play');
+});
+
+socket.on('bomb_state', (next) => {
+  const prev = bomb;
+  bomb = next && next.phase ? next : null;
+  if (bomb) applyBombScores(room, bomb);
+  reactBomb(prev, bomb);
+  if (me && room && room.roundStatus === 'playing') render();
 });
 
 function hideBoard() {
@@ -545,8 +675,9 @@ if (isHost) {
   });
 
   socket.on('admin_notice', ({ message }) => {
+    hostNote = message || '';
     const hint = document.getElementById('start-hint');
-    if (hint) hint.textContent = message;
+    if (hint && hostNote) hint.textContent = hostNote;
     const abort = document.getElementById('abort');
     const abortBox = document.getElementById('abort-confirm');
     if (abort && abortBox && room && room.roundStatus === 'playing' && abortBox.hidden) {

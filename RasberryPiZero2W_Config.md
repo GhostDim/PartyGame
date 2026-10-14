@@ -1,4 +1,4 @@
-Плата
+.Плата
 
 ```
 Плата: Rasberry Pi Zero 2W
@@ -17,13 +17,12 @@ wi-fi-pass: EDA8HD6D6J
 Зарядка -
 Аккумулятор - 18650 2шт.
 Адресная RGB - WS2812B 60LED/m 5V IP20
+Ленту заменить на - WS2812B 144!
 ```
 
 Команды
 
 ```
-пщые
-ъ
 ssh gost@PartyBox.local
 sudo reboot
 sudo poweroff
@@ -76,13 +75,13 @@ sudo systemctl enable ssh
 Активируйте обработку кнопки в системе:
 
 ```
-nano /boot/firmware/config.txtн
+nano /boot/firmware/config.txt
 ```
 
 В самый конец файла добавить строку:
 
 ```
-dtoverlay=gpio-shutdown,gpio\_pin=3
+dtoverlay=gpio-shutdown,gpio_pin=3
 ```
 
 3 Увеличение подкачки до 1Гб
@@ -104,9 +103,21 @@ echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 1 Node.js
 
 ```
-sudo apt update \&\& sudo apt install -y nodejs npm
+sudo apt update && sudo apt install -y nodejs npm
 
-mkdir -p \~/PartyBox
+mkdir -p ~/PartyBox
 ```
 
 Критерий успеха: команды node -v и npm -v выводят установленные версии.
+
+2 Для ленты доработать конфиг!
+
+```
+sudo nano /boot/firmware/config.txt
+Добавьте в самый конец файла эти строки:
+core_freq=250
+core_freq_min=250
+```
+
+`force_turbo=1` не добавлять: при 5,10 В плата с этой строкой не включается. Если уже добавлена и плата молчит, удалить её из `config.txt` на карте через компьютер.
+

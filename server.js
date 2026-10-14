@@ -5,6 +5,7 @@ const { Server } = require('socket.io');
 const { GameStateManager } = require('./lib/gameState');
 const { sampleBoard } = require('./lib/boardStats');
 const { Lights } = require('./lib/lights');
+const { HotBomb } = require('./games/hotbomb');
 
 const PORT = 3000;
 const ADMIN_PASSWORD = 'admin';
@@ -13,6 +14,7 @@ const LOGIN_LOCK_MS = 15000;
 
 const state = new GameStateManager();
 const lights = new Lights();
+let game = null;
 const loginGuard = new Map();
 let lastBoard = sampleBoard();
 
@@ -42,6 +44,35 @@ const io = new Server(server, {
 
 function broadcast() {
   io.emit('room_state', state.snapshot());
+}
+
+function stopGame() {
+  if (!game) return;
+  const current = game;
+  game = null;
+  current.destroy();
+}
+
+function abortGame(message) {
+  stopGame();
+  state.cancelStart();
+  lights.setMode('lobby');
+  broadcast();
+  for (const socket of io.sockets.sockets.values()) {
+    if (socket.data.isAdmin) socket.emit('admin_notice', { message });
+  }
+}
+
+function sendBomb(socket) {
+  if (game && socket) socket.emit('bomb_state', game.view());
+}
+
+function onlineCount() {
+  let count = 0;
+  for (const player of state.players.values()) {
+    if (player.isOnline) count += 1;
+  }
+  return count;
 }
 
 function votesUpdated() {
@@ -106,6 +137,7 @@ function noteLoginFailure(socketId) {
 
 io.on('connection', (socket) => {
   socket.emit('room_state', state.snapshot());
+  sendBomb(socket);
 
   socket.on('admin_login', (payload) => {
     const password = payload && payload.password;
@@ -162,10 +194,25 @@ io.on('connection', (socket) => {
 
   socket.on('start_game', () => {
     if (!requireAdmin(socket)) return;
+    const gameId = state.resolveGameId();
+    if (gameId === 'hotbomb' && onlineCount() < 3) {
+      socket.emit('admin_notice', { message: 'Для «Горячей бомбы» нужны минимум 3 игрока в сети' });
+      return;
+    }
     const result = state.start();
     if (!result.ok) {
       socket.emit('admin_notice', { message: result.error });
       return;
+    }
+    if (result.game.id === 'hotbomb') {
+      game = new HotBomb(io, state, lights, {
+        onScores: broadcast,
+        onAbort: abortGame,
+      });
+      if (!game.init()) {
+        abortGame('Для «Горячей бомбы» нужны минимум 3 игрока в сети');
+        return;
+      }
     }
     lights.setMode('playing');
     io.emit('game_start', {
@@ -177,6 +224,7 @@ io.on('connection', (socket) => {
 
   socket.on('return_to_lobby', () => {
     if (!requireAdmin(socket)) return;
+    stopGame();
     const result = state.returnToLobby();
     if (!result.ok) {
       socket.emit('admin_notice', { message: result.error });
@@ -189,6 +237,7 @@ io.on('connection', (socket) => {
   socket.on('tv_hello', () => {
     socket.data.role = 'tv';
     socket.emit('room_state', state.snapshot());
+    sendBomb(socket);
   });
 
   socket.on('player_register', (payload) => {
@@ -205,6 +254,7 @@ io.on('connection', (socket) => {
         socket.data.playerId = host.id;
         const player = state.attach(host.id, socket.id);
         socket.emit('player_ready', { player });
+        if (game) game.onPlayerJoin(player.id);
         broadcast();
         return;
       }
@@ -212,6 +262,7 @@ io.on('connection', (socket) => {
     if (socket.data.playerId && state.players.has(socket.data.playerId)) {
       const current = state.attach(socket.data.playerId, socket.id);
       socket.emit('player_ready', { player: current });
+      if (game) game.onPlayerJoin(current.id);
       broadcast();
       return;
     }
@@ -226,6 +277,7 @@ io.on('connection', (socket) => {
     }
     const player = state.attach(result.player.id, socket.id);
     socket.emit('player_ready', { player });
+    if (game) game.onPlayerJoin(player.id);
     broadcast();
   });
 
@@ -238,6 +290,7 @@ io.on('connection', (socket) => {
     }
     socket.data.playerId = player.id;
     socket.emit('player_ready', { player });
+    if (game) game.onPlayerJoin(player.id);
     broadcast();
   });
 
@@ -248,12 +301,14 @@ io.on('connection', (socket) => {
       return;
     }
     socket.emit('player_ready', { player: result.player });
+    if (game) game.onPlayerJoin(result.player.id);
     broadcast();
   });
 
   socket.on('player_leave', () => {
     const playerId = socket.data.playerId;
     if (!playerId) return;
+    if (game) game.onPlayerLeave(playerId);
     state.remove(playerId);
     socket.data.playerId = null;
     socket.emit('player_left');
@@ -269,6 +324,16 @@ io.on('connection', (socket) => {
       socket.emit('admin_notice', { message: 'Себя уберите через «Выйти» в настройках' });
       return;
     }
+    const target = state.players.get(playerId);
+    if (!target) {
+      socket.emit('admin_notice', { message: 'Игрок не найден' });
+      return;
+    }
+    if (target.isHost) {
+      socket.emit('admin_notice', { message: 'Ведущего нельзя удалить' });
+      return;
+    }
+    if (game) game.onPlayerLeave(playerId);
     const result = state.kick(playerId);
     if (!result.ok) {
       socket.emit('admin_notice', { message: result.error });
@@ -295,10 +360,17 @@ io.on('connection', (socket) => {
     broadcast();
   });
 
+  socket.on('player_action', (payload) => {
+    if (!game || !socket.data.playerId) return;
+    game.onAction(socket.data.playerId, payload || {});
+  });
+
   socket.on('disconnect', () => {
     loginGuard.delete(socket.id);
     const player = state.detachBySocket(socket.id);
-    if (player) broadcast();
+    if (!player) return;
+    if (game) game.onPlayerJoin(player.id);
+    broadcast();
   });
 });
 
@@ -309,6 +381,7 @@ let closing = false;
 function shutdown() {
   if (closing) return;
   closing = true;
+  stopGame();
   lights.stop();
   setTimeout(() => process.exit(0), 300).unref();
 }

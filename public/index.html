@@ -41,9 +41,19 @@
     </section>
 
     <section id="view-play" class="panel" hidden>
-      <p class="brand">PartyBox</p>
-      <h1 id="play-title">Игра началась</h1>
-      <p id="play-note" class="wait">Кнопки раунда появятся на этом экране.</p>
+      <div id="play-generic">
+        <p class="brand">PartyBox</p>
+        <h1 id="play-title">Игра началась</h1>
+        <p id="play-note" class="wait">Кнопки раунда появятся на этом экране.</p>
+      </div>
+      <div id="play-bomb" hidden>
+        <div id="bomb-chain" class="bomb-chain" aria-label="Очередь передачи"></div>
+        <p id="bomb-count" class="bomb-count" aria-live="assertive" hidden></p>
+        <p id="bomb-status" class="bomb-status" aria-live="polite"></p>
+        <p id="bomb-score" class="bomb-hero-score" hidden></p>
+        <button id="bomb-pass" class="bomb-pass" type="button" hidden>ПЕРЕДАТЬ</button>
+        <div id="bomb-winners" class="bomb-winners" hidden></div>
+      </div>
     </section>
   </div>
   <button id="open-rank" class="fab fab-rank" type="button" hidden aria-label="Рейтинг">
@@ -78,6 +88,7 @@
   </dialog>
   <script src="/socket.io/socket.io.js"></script>
   <script src="/common.js"></script>
+  <script src="/bomb.js"></script>
   <script src="/player.js"></script>
 </body>
 </html>

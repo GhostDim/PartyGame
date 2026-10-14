@@ -16,11 +16,25 @@
       <h1 id="tv-title">Лобби</h1>
       <p id="tv-status" class="wait is-waiting">Ожидание гостей</p>
     </header>
-    <ul id="guests" class="guest-grid"></ul>
-    <div id="bars" class="tv-bars"></div>
+    <div id="tv-lobby">
+      <ul id="guests" class="guest-grid"></ul>
+      <div id="bars" class="tv-bars"></div>
+    </div>
+    <div id="tv-bomb" hidden>
+      <div id="tv-bomb-chain" class="bomb-lineup" aria-label="Очередь передачи"></div>
+      <div id="tv-bomb-center" class="bomb-center">
+        <p id="tv-count" class="bomb-count" aria-live="assertive" hidden></p>
+        <p id="tv-hero" class="bomb-hero" hidden></p>
+        <p id="tv-hero-name" class="bomb-hero-name" hidden></p>
+        <p id="tv-hero-score" class="bomb-hero-score" hidden></p>
+        <div id="tv-winners" class="bomb-winners" hidden></div>
+      </div>
+      <p id="tv-bomb-line" class="bomb-line" aria-live="polite"></p>
+    </div>
   </div>
   <script src="/socket.io/socket.io.js"></script>
   <script src="/common.js"></script>
+  <script src="/bomb.js"></script>
   <script src="/tv.js"></script>
 </body>
 </html>
