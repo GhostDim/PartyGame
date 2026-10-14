@@ -10,7 +10,7 @@ import json
 import sys
 
 SPI_HZ = 3200000
-LED_COUNT = 16
+LED_COUNT = 48
 RESET_BYTES = 100
 
 def _spi_bytes(value):
