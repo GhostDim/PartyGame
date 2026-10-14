@@ -5,6 +5,7 @@ const { Server } = require('socket.io');
 const { GameStateManager } = require('./lib/gameState');
 const { sampleBoard } = require('./lib/boardStats');
 const { Lights } = require('./lib/lights');
+const { Audio } = require('./lib/audio');
 const { HotBomb } = require('./games/hotbomb');
 
 const PORT = 3000;
@@ -14,6 +15,7 @@ const LOGIN_LOCK_MS = 15000;
 
 const state = new GameStateManager();
 const lights = new Lights();
+const audio = new Audio();
 let game = null;
 const loginGuard = new Map();
 let lastBoard = sampleBoard();
@@ -382,6 +384,7 @@ function shutdown() {
   if (closing) return;
   closing = true;
   stopGame();
+  audio.stop();
   lights.stop();
   setTimeout(() => process.exit(0), 300).unref();
 }
@@ -398,4 +401,5 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log('Игрок:  http://localhost:3000/');
   console.log('ТВ:     http://localhost:3000/tv');
   console.log('Админ:  http://localhost:3000/admin');
+  audio.start();
 });
