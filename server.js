@@ -7,6 +7,7 @@ const { sampleBoard } = require('./lib/boardStats');
 const { Lights } = require('./lib/lights');
 const { Audio } = require('./lib/audio');
 const { HotBomb } = require('./games/hotbomb');
+const { Quiz } = require('./games/quiz');
 
 const PORT = 3000;
 const ADMIN_PASSWORD = 'admin';
@@ -65,8 +66,13 @@ function abortGame(message) {
   }
 }
 
-function sendBomb(socket) {
-  if (game && socket) socket.emit('bomb_state', game.view());
+function sendGame(socket) {
+  if (!game || !socket) return;
+  if (game instanceof HotBomb) socket.emit('bomb_state', game.view());
+  if (game instanceof Quiz) {
+    socket.emit('quiz_state', game.view());
+    if (socket.data.playerId) socket.emit('quiz_mine', game.mine(socket.data.playerId));
+  }
 }
 
 function onlineCount() {
@@ -139,7 +145,7 @@ function noteLoginFailure(socketId) {
 
 io.on('connection', (socket) => {
   socket.emit('room_state', state.snapshot());
-  sendBomb(socket);
+  sendGame(socket);
 
   socket.on('admin_login', (payload) => {
     const password = payload && payload.password;
@@ -201,6 +207,10 @@ io.on('connection', (socket) => {
       socket.emit('admin_notice', { message: 'Для «Горячей бомбы» нужны минимум 3 игрока в сети' });
       return;
     }
+    if (gameId === 'quiz' && onlineCount() < 1) {
+      socket.emit('admin_notice', { message: 'Для викторины нужен игрок в сети' });
+      return;
+    }
     const result = state.start();
     if (!result.ok) {
       socket.emit('admin_notice', { message: result.error });
@@ -213,6 +223,15 @@ io.on('connection', (socket) => {
       });
       if (!game.init()) {
         abortGame('Для «Горячей бомбы» нужны минимум 3 игрока в сети');
+        return;
+      }
+    } else if (result.game.id === 'quiz') {
+      game = new Quiz(io, state, {
+        onScores: broadcast,
+        onAbort: abortGame,
+      });
+      if (!game.init()) {
+        abortGame('Не удалось начать викторину');
         return;
       }
     }
@@ -239,7 +258,7 @@ io.on('connection', (socket) => {
   socket.on('tv_hello', () => {
     socket.data.role = 'tv';
     socket.emit('room_state', state.snapshot());
-    sendBomb(socket);
+    sendGame(socket);
   });
 
   socket.on('player_register', (payload) => {

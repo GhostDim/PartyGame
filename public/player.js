@@ -17,6 +17,8 @@ const hostDialog = document.getElementById('host-sheet');
 let room = null;
 let me = null;
 let bomb = null;
+let quiz = null;
+let quizMine = null;
 let hostNote = '';
 let chosen = null;
 let seenStatus = null;
@@ -265,17 +267,21 @@ function render() {
   const fresh = room.players.find((player) => player.id === me.id);
   if (fresh) me = fresh;
 
-  document.getElementById('me-avatar').textContent = me.avatar;
+  paintFace(document.getElementById('me-avatar'), me.avatar, me.cups);
   document.getElementById('me-name').textContent = me.nickname;
-  document.getElementById('me-score').textContent = pointsLabel(me.score);
   renderRank();
 
   if (seenStatus === 'playing' && room.roundStatus === 'lobby') buzz([40, 30, 40]);
   seenStatus = room.roundStatus;
 
-  if (room.roundStatus !== 'playing') bomb = null;
+  if (room.roundStatus !== 'playing') {
+    bomb = null;
+    if (quiz) syncQuizClock('player', null);
+    quiz = null;
+    quizMine = null;
+  }
   if (room.roundStatus === 'playing') {
-    if (room.activeGame !== 'hotbomb') {
+    if (room.activeGame !== 'hotbomb' && room.activeGame !== 'quiz') {
       document.getElementById('play-title').textContent = gameTitle(room, room.activeGame);
       document.getElementById('play-note').textContent = room.tvMode
         ? 'Следите за общим экраном. Кнопки раунда появятся здесь.'
@@ -283,6 +289,7 @@ function render() {
     }
     show('play');
     paintPlayerBomb();
+    paintPlayerQuiz();
   } else {
     show('lobby');
     renderGames();
@@ -304,11 +311,20 @@ function ensureGames(games) {
   gamesReady = true;
 }
 
+function cupValue(player) {
+  return (player.cups || []).reduce((sum, cup) => {
+    if (cup.place === 1) return sum + 3;
+    if (cup.place === 2) return sum + 2;
+    return sum + 1;
+  }, 0);
+}
+
 function renderRank() {
   const list = document.getElementById('rank-list');
   if (!list || !room) return;
   const players = room.players.slice().sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
+    const diff = cupValue(b) - cupValue(a);
+    if (diff) return diff;
     return a.nickname.localeCompare(b.nickname, 'ru');
   });
   clearNode(list);
@@ -320,11 +336,13 @@ function renderRank() {
     const item = make('li', 'player');
     const meta = make('div', 'meta');
     const self = me && player.id === me.id;
-    meta.append(
-      make('strong', null, player.nickname + (self ? ' (вы)' : '')),
-      make('span', null, pointsLabel(player.score))
-    );
-    item.append(make('span', 'place', String(index + 1)), make('span', 'face', player.avatar), meta);
+    const face = make('span', 'face');
+    paintFace(face, player.avatar, null);
+    meta.appendChild(make('strong', null, player.nickname + (self ? ' (вы)' : '')));
+    const row = make('span', 'cups cups-row');
+    fillCups(row, player.cups);
+    meta.appendChild(row);
+    item.append(make('span', 'place', String(index + 1)), face, meta);
     list.appendChild(item);
   });
 }
@@ -441,6 +459,105 @@ if (passButton) {
     socket.emit('player_action', { type: 'pass' });
   });
 }
+
+function paintPlayerQuiz() {
+  const box = document.getElementById('play-quiz');
+  const generic = document.getElementById('play-generic');
+  if (!box) return;
+  const playing = !!(room && room.roundStatus === 'playing' && room.activeGame === 'quiz');
+  if (!playing) {
+    box.hidden = true;
+    return;
+  }
+  if (generic) generic.hidden = true;
+  box.hidden = false;
+  paintQuizPlayer(quiz, me, quizMine);
+}
+
+function sendQuizAnswer(option) {
+  if (!quiz || (quiz.phase !== 'ask' && quiz.phase !== 'final')) return;
+  if (quizMine && quizMine.option != null) return;
+  quizMine = Object.assign({}, quizMine, { option });
+  socket.emit('player_action', { type: 'answer', option });
+  paintPlayerQuiz();
+}
+
+function sendQuizSwipe(up) {
+  if (!quiz || quiz.phase !== 'mini') return;
+  if (quizMine && quizMine.up != null) return;
+  quizMine = Object.assign({}, quizMine, { up });
+  buzz(30);
+  socket.emit('player_action', { type: 'swipe', up });
+  paintPlayerQuiz();
+}
+
+function sendQuizBet(lock) {
+  if (!quiz || quiz.phase !== 'bet') return;
+  if (quizMine && quizMine.betLocked) return;
+  const slider = document.getElementById('quiz-bet-range');
+  const amount = slider ? Number(slider.value) || 0 : 0;
+  quizMine = Object.assign({}, quizMine, { bet: amount, betLocked: !!lock });
+  socket.emit('player_action', { type: 'bet', amount, lock: !!lock });
+  if (lock) paintPlayerQuiz();
+}
+
+const quizOptions = document.getElementById('quiz-options');
+if (quizOptions) {
+  quizOptions.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-option]');
+    if (!button || button.disabled) return;
+    sendQuizAnswer(Number(button.dataset.option));
+  });
+}
+
+const quizUp = document.getElementById('quiz-up');
+const quizDown = document.getElementById('quiz-down');
+if (quizUp) quizUp.addEventListener('click', () => sendQuizSwipe(true));
+if (quizDown) quizDown.addEventListener('click', () => sendQuizSwipe(false));
+
+const quizCard = document.getElementById('quiz-card');
+if (quizCard) {
+  let swipeY = null;
+  quizCard.addEventListener('pointerdown', (event) => {
+    if (!quiz || quiz.phase !== 'mini') return;
+    swipeY = event.clientY;
+    if (quizCard.setPointerCapture) quizCard.setPointerCapture(event.pointerId);
+  });
+  quizCard.addEventListener('pointerup', (event) => {
+    if (swipeY == null) return;
+    const delta = event.clientY - swipeY;
+    swipeY = null;
+    if (delta <= -56) sendQuizSwipe(true);
+    else if (delta >= 56) sendQuizSwipe(false);
+  });
+  quizCard.addEventListener('pointercancel', () => {
+    swipeY = null;
+  });
+}
+
+const quizSlider = document.getElementById('quiz-bet-range');
+let quizBetTimer = null;
+if (quizSlider) {
+  quizSlider.addEventListener('input', () => {
+    const label = document.getElementById('quiz-bet-value');
+    if (label) label.textContent = pointsLabel(Number(quizSlider.value) || 0);
+    clearTimeout(quizBetTimer);
+    quizBetTimer = setTimeout(() => sendQuizBet(false), 120);
+  });
+}
+const quizLock = document.getElementById('quiz-bet-lock');
+if (quizLock) quizLock.addEventListener('click', () => sendQuizBet(true));
+document.querySelectorAll('#quiz-bet [data-bet]').forEach((button) => {
+  button.addEventListener('click', () => {
+    if (!quizSlider || button.disabled) return;
+    const purse = Number(quizSlider.max) || 0;
+    let amount = 0;
+    if (button.dataset.bet === 'all') amount = purse;
+    else if (button.dataset.bet === 'half') amount = Math.floor(purse / 2);
+    quizSlider.value = String(amount);
+    quizSlider.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+});
 
 document.getElementById('open-settings').addEventListener('click', openSettings);
 document.getElementById('settings-close').addEventListener('click', () => settingsDialog.close());
@@ -597,13 +714,14 @@ socket.on('game_start', (payload) => {
   if (hostDialog && hostDialog.open) hostDialog.close();
   if (!me) return;
   seenStatus = 'playing';
-  if (payload && payload.gameId === 'hotbomb') {
-    if (room) {
-      room.roundStatus = 'playing';
-      room.activeGame = 'hotbomb';
-    }
+  const gameId = payload && payload.gameId;
+  if (room && gameId) {
+    room.roundStatus = 'playing';
+    room.activeGame = gameId;
+  }
+  if (gameId === 'hotbomb' || gameId === 'quiz') {
     show('play');
-    paintPlayerBomb();
+    render();
     return;
   }
   document.getElementById('play-title').textContent = (payload && payload.title) || 'Игра началась';
@@ -616,6 +734,25 @@ socket.on('bomb_state', (next) => {
   if (bomb) applyBombScores(room, bomb);
   reactBomb(prev, bomb);
   if (me && room && room.roundStatus === 'playing') render();
+});
+
+socket.on('quiz_state', (next) => {
+  const prev = quiz;
+  quiz = next && next.phase ? next : null;
+  if (quiz) {
+    quiz.at = Date.now();
+    applyQuizScores(room, quiz);
+  } else {
+    quizMine = null;
+  }
+  reactQuiz(prev, quiz, me, buzz);
+  syncQuizClock('player', quiz);
+  if (me && room && (room.roundStatus === 'playing' || !quiz)) render();
+});
+
+socket.on('quiz_mine', (next) => {
+  quizMine = next || null;
+  if (me && room && room.roundStatus === 'playing') paintPlayerQuiz();
 });
 
 function hideBoard() {

@@ -208,7 +208,7 @@ class HotBomb {
       if (this.dead || this.phase !== 'boom') return;
       const left = this.order.filter((id) => this.alive.has(id));
       if (left.length <= 2) {
-        this.finish(left);
+        this.finish(left, victim);
         return;
       }
       this.boomId = null;
@@ -220,7 +220,7 @@ class HotBomb {
     this.boomTimer.unref();
   }
 
-  finish(ids) {
+  finish(ids, thirdId) {
     if (this.dead || this.phase === 'over') return;
     this.clearTimers();
     this.phase = 'over';
@@ -237,8 +237,11 @@ class HotBomb {
       const nb = pb ? pb.nickname : '';
       return na.localeCompare(nb, 'ru');
     });
+    const places = this.winners.slice();
+    if (thirdId && places.indexOf(thirdId) === -1) places.push(thirdId);
+    this.state.awardCups('hotbomb', places);
     this.lights.clearBomb();
-    this.emit(false);
+    this.emit(true);
   }
 
   nextAfter(fromId) {
@@ -270,6 +273,7 @@ class HotBomb {
         avatar: player.avatar,
         alive: this.alive.has(id),
         score: player.score,
+        cups: this.state.cupsPublic(player),
         online: player.isOnline,
       });
     }

@@ -17,8 +17,8 @@
       <p id="tv-status" class="wait is-waiting">Ожидание гостей</p>
     </header>
     <div id="tv-lobby">
-      <ul id="guests" class="guest-grid"></ul>
       <div id="bars" class="tv-bars"></div>
+      <ul id="guests" class="guest-grid"></ul>
     </div>
     <div id="tv-bomb" hidden>
       <div id="tv-bomb-chain" class="bomb-lineup" aria-label="Очередь передачи"></div>
@@ -31,10 +31,26 @@
       </div>
       <p id="tv-bomb-line" class="bomb-line" aria-live="polite"></p>
     </div>
+    <div id="tv-quiz" hidden>
+      <div id="tv-quiz-roster" class="quiz-roster" aria-label="Игроки"></div>
+      <div class="quiz-head">
+        <p id="tv-quiz-kicker" class="quiz-kicker"></p>
+        <p id="tv-quiz-clock" class="quiz-clock" hidden></p>
+      </div>
+      <div id="tv-quiz-bar" class="quiz-bar" hidden><span></span></div>
+      <p id="tv-quiz-count" class="bomb-count" aria-live="assertive" hidden></p>
+      <p id="tv-quiz-text" class="quiz-text"></p>
+      <div id="tv-quiz-options" class="quiz-options"></div>
+      <p id="tv-quiz-card" class="quiz-card" hidden></p>
+      <p id="tv-quiz-hint" class="quiz-note is-hint"></p>
+      <div id="tv-quiz-bets" class="quiz-bets"></div>
+      <div id="tv-quiz-podium" class="bomb-winners quiz-podium" hidden></div>
+    </div>
   </div>
   <script src="/socket.io/socket.io.js"></script>
   <script src="/common.js"></script>
   <script src="/bomb.js"></script>
+  <script src="/quiz.js"></script>
   <script src="/tv.js"></script>
 </body>
 </html>

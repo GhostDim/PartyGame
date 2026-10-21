@@ -111,7 +111,7 @@ function fillBombChain(container, view) {
     const score = item.querySelector('.bomb-score');
     const glyph = faceGlyph(seat, view);
     const badge = markGlyph(seat, view);
-    if (face.textContent !== glyph) face.textContent = glyph;
+    paintFace(face, glyph, seat.cups);
     if (mark.textContent !== badge) mark.textContent = badge;
     if (name.textContent !== seat.nickname) name.textContent = seat.nickname;
     const points = String(seat.score);
@@ -131,7 +131,7 @@ function fillWinners(container, view) {
   if (!container) return;
   const key = (view.winners || []).map((id) => {
     const seat = seatById(view, id);
-    return id + ':' + (seat ? seat.score : 0);
+    return id + ':' + (seat ? seat.score : 0) + ':' + cupsKey(seat && seat.cups);
   }).join(',');
   if (container.dataset.key === key && container.childElementCount) return;
   container.dataset.key = key;
@@ -140,8 +140,10 @@ function fillWinners(container, view) {
     const seat = seatById(view, id);
     if (!seat) return;
     const card = make('div', 'bomb-winner');
+    const face = make('span', 'bomb-face');
+    paintFace(face, seat.avatar, seat.cups);
     card.append(
-      make('span', 'bomb-face', seat.avatar),
+      face,
       make('strong', null, seat.nickname),
       make('span', null, pointsLabel(seat.score))
     );
@@ -153,7 +155,10 @@ function applyBombScores(room, view) {
   if (!room || !view || !view.chain || !room.players) return;
   view.chain.forEach((seat) => {
     const player = room.players.find((item) => item.id === seat.id);
-    if (player) player.score = seat.score;
+    if (player) {
+      player.score = seat.score;
+      if (seat.cups) player.cups = seat.cups;
+    }
   });
 }
 

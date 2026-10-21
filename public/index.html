@@ -33,7 +33,6 @@
         <span id="me-avatar" class="face"></span>
         <div>
           <strong id="me-name"></strong>
-          <span id="me-score" class="muted"></span>
         </div>
       </header>
       <p id="wait-note" class="wait" aria-live="polite">Ожидание запуска игры ведущим...</p>
@@ -54,16 +53,48 @@
         <button id="bomb-pass" class="bomb-pass" type="button" hidden>ПЕРЕДАТЬ</button>
         <div id="bomb-winners" class="bomb-winners" hidden></div>
       </div>
+      <div id="play-quiz" hidden>
+        <div class="quiz-head">
+          <p id="quiz-kicker" class="quiz-kicker"></p>
+          <p id="quiz-score" class="quiz-score"></p>
+          <p id="quiz-clock" class="quiz-clock" hidden></p>
+        </div>
+        <div id="quiz-bar" class="quiz-bar" hidden><span></span></div>
+        <p id="quiz-count" class="bomb-count" aria-live="assertive" hidden></p>
+        <p id="quiz-text" class="quiz-text"></p>
+        <div id="quiz-options" class="quiz-options"></div>
+        <div id="quiz-swipe" hidden>
+          <p id="quiz-card" class="quiz-card"></p>
+          <div class="quiz-ways">
+            <button id="quiz-up" type="button"></button>
+            <button id="quiz-down" type="button"></button>
+          </div>
+        </div>
+        <div id="quiz-bet" hidden>
+          <p id="quiz-bet-have"></p>
+          <input id="quiz-bet-range" type="range" min="0" max="0" value="0" step="1" aria-label="Ставка">
+          <p id="quiz-bet-value" class="quiz-score"></p>
+          <div class="quiz-presets">
+            <button type="button" data-bet="0">Ничего</button>
+            <button type="button" data-bet="half">Половина</button>
+            <button type="button" data-bet="all">Всё</button>
+          </div>
+          <button id="quiz-bet-lock" type="button">Поставить</button>
+        </div>
+        <p id="quiz-note" class="quiz-note" aria-live="polite"></p>
+        <p id="quiz-ready" class="quiz-ready" hidden></p>
+        <div id="quiz-podium" class="bomb-winners quiz-podium" hidden></div>
+      </div>
     </section>
   </div>
-  <button id="open-rank" class="fab fab-rank" type="button" hidden aria-label="Рейтинг">
+  <button id="open-rank" class="fab fab-rank" type="button" hidden aria-label="Кубки">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v2h3a1 1 0 0 1 1 1v2a5 5 0 0 1-4.1 4.9A5 5 0 0 1 13 16.9V19h3v2H8v-2h3v-2.1a5 5 0 0 1-3.9-3.9A5 5 0 0 1 3 8V6a1 1 0 0 1 1-1h3V3zm10 4h2v1a3 3 0 0 1-2 2.8V7zM5 7h2v3.8A3 3 0 0 1 5 8V7z"/></svg>
   </button>
   <button id="open-settings" class="fab fab-settings" type="button" hidden aria-label="Настройки">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.4 13a7.8 7.8 0 0 0 .1-1 7.8 7.8 0 0 0-.1-1l2.1-1.6a.5.5 0 0 0 .1-.6l-2-3.4a.5.5 0 0 0-.6-.2l-2.5 1a7 7 0 0 0-1.7-1L14.6 2a.5.5 0 0 0-.5-.4h-4.2a.5.5 0 0 0-.5.4l-.3 2.6a7 7 0 0 0-1.7 1l-2.5-1a.5.5 0 0 0-.6.2l-2 3.4a.5.5 0 0 0 .1.6L4.5 11a7.8 7.8 0 0 0 0 2l-2.1 1.6a.5.5 0 0 0-.1.6l2 3.4a.5.5 0 0 0 .6.2l2.5-1a7 7 0 0 0 1.7 1l.3 2.6a.5.5 0 0 0 .5.4h4.2a.5.5 0 0 0 .5-.4l.3-2.6a7 7 0 0 0 1.7-1l2.5 1a.5.5 0 0 0 .6-.2l2-3.4a.5.5 0 0 0-.1-.6L19.4 13zM12 15.5A3.5 3.5 0 1 1 15.5 12 3.5 3.5 0 0 1 12 15.5z"/></svg>
   </button>
   <dialog id="rank-sheet" class="sheet">
-    <h2>Рейтинг</h2>
+    <h2>Кубки</h2>
     <ol id="rank-list" class="player-list"></ol>
     <button id="rank-close" class="ghost" type="button">Закрыть</button>
   </dialog>
@@ -89,6 +120,7 @@
   <script src="/socket.io/socket.io.js"></script>
   <script src="/common.js"></script>
   <script src="/bomb.js"></script>
+  <script src="/quiz.js"></script>
   <script src="/player.js"></script>
 </body>
 </html>
