@@ -2,6 +2,7 @@ const socket = io();
 let room = null;
 let bomb = null;
 let quiz = null;
+let eki = null;
 
 function seatTotal() {
   if (room && Array.isArray(room.avatars) && room.avatars.length) return room.avatars.length;
@@ -186,14 +187,20 @@ function render(next) {
   paintLobbyCount();
   const hot = room.roundStatus === 'playing' && room.activeGame === 'hotbomb';
   const quizOn = room.roundStatus === 'playing' && room.activeGame === 'quiz';
+  const ekiOn = room.roundStatus === 'playing' && room.activeGame === 'ekivoki';
   const showBomb = hot && room.tvMode;
   const showQuiz = quizOn && room.tvMode;
+  const showEki = ekiOn && room.tvMode;
+  document.body.classList.toggle('is-eki', showEki);
+  if (!showEki) syncEkiClock('tv', null);
   document.getElementById('phones-banner').hidden = room.tvMode;
-  document.getElementById('tv-lobby').hidden = showBomb || showQuiz;
-  document.getElementById('bars').hidden = hot || quizOn;
+  document.getElementById('tv-lobby').hidden = showBomb || showQuiz || showEki;
+  document.getElementById('bars').hidden = hot || quizOn || ekiOn;
   document.getElementById('tv-bomb').hidden = !showBomb;
   const quizBox = document.getElementById('tv-quiz');
   if (quizBox) quizBox.hidden = !showQuiz;
+  const ekiBox = document.getElementById('tv-ekivoki');
+  if (ekiBox) ekiBox.hidden = !showEki;
 
   if (hot) {
     title.textContent = gameTitle(room, room.activeGame);
@@ -216,10 +223,20 @@ function render(next) {
     return;
   }
 
+  if (ekiOn) {
+    title.textContent = gameTitle(room, room.activeGame);
+    paintStatus(ekiStatus(eki, room.tvMode), false);
+    if (showEki) paintEkiTv(eki);
+    else renderGuests(room.players, true);
+    return;
+  }
+
   if (room.roundStatus !== 'playing') {
     bomb = null;
     if (quiz) syncQuizClock('tv', null);
     quiz = null;
+    syncEkiClock('tv', null);
+    eki = null;
   }
   if (room.roundStatus === 'playing') {
     title.textContent = gameTitle(room, room.activeGame);
@@ -257,7 +274,7 @@ socket.on('votes_updated', (data) => {
 
 socket.on('game_start', (payload) => {
   const gameId = payload && payload.gameId;
-  if ((gameId === 'hotbomb' || gameId === 'quiz') && room) {
+  if ((gameId === 'hotbomb' || gameId === 'quiz' || gameId === 'ekivoki') && room) {
     room.roundStatus = 'playing';
     room.activeGame = gameId;
     render(room);
@@ -285,6 +302,20 @@ socket.on('quiz_state', (next) => {
   }
   syncQuizClock('tv', quiz);
   if (room && (room.roundStatus === 'playing' || !quiz)) render(room);
+});
+
+socket.on('ekivoki_state', (next) => {
+  eki = next && next.phase ? next : null;
+  if (eki) {
+    eki.at = Date.now();
+    applyEkiScores(room, eki);
+  }
+  if (room && (room.roundStatus === 'playing' || !eki)) render(room);
+});
+
+document.addEventListener('eki-landed', (event) => {
+  if (!event.target || event.target.id !== 'tv-eki-die') return;
+  if (room) paintEkiTv(eki);
 });
 
 if (document.body.classList.contains('is-lobby')) {

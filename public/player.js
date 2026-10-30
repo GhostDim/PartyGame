@@ -19,6 +19,8 @@ let me = null;
 let bomb = null;
 let quiz = null;
 let quizMine = null;
+let eki = null;
+let ekiMine = null;
 let hostNote = '';
 let chosen = null;
 let seenStatus = null;
@@ -279,9 +281,12 @@ function render() {
     if (quiz) syncQuizClock('player', null);
     quiz = null;
     quizMine = null;
+    syncEkiClock('player', null);
+    eki = null;
+    ekiMine = null;
   }
   if (room.roundStatus === 'playing') {
-    if (room.activeGame !== 'hotbomb' && room.activeGame !== 'quiz') {
+    if (room.activeGame !== 'hotbomb' && room.activeGame !== 'quiz' && room.activeGame !== 'ekivoki') {
       document.getElementById('play-title').textContent = gameTitle(room, room.activeGame);
       document.getElementById('play-note').textContent = room.tvMode
         ? 'Следите за общим экраном. Кнопки раунда появятся здесь.'
@@ -290,6 +295,7 @@ function render() {
     show('play');
     paintPlayerBomb();
     paintPlayerQuiz();
+    paintPlayerEki();
   } else {
     show('lobby');
     renderGames();
@@ -349,6 +355,7 @@ function renderRank() {
 
 function renderHost() {
   if (!isHost || !hostAuthed || !room || !hostDialog) return;
+  paintEkiHost(eki, room);
   ensureGames(room.games);
 
   const votes = document.getElementById('votes');
@@ -474,6 +481,25 @@ function paintPlayerQuiz() {
   paintQuizPlayer(quiz, me, quizMine);
 }
 
+function paintPlayerEki() {
+  const box = document.getElementById('play-ekivoki');
+  const generic = document.getElementById('play-generic');
+  if (!box) return;
+  const playing = !!(room && room.roundStatus === 'playing' && room.activeGame === 'ekivoki');
+  if (!playing) {
+    box.hidden = true;
+    return;
+  }
+  if (generic) generic.hidden = true;
+  box.hidden = false;
+  paintEkiPlayer(eki, ekiMine, me, room);
+}
+
+function sendEki(type) {
+  if (!eki || !socket) return;
+  socket.emit('player_action', { type });
+}
+
 function sendQuizAnswer(option) {
   if (!quiz || (quiz.phase !== 'ask' && quiz.phase !== 'final')) return;
   if (quizMine && quizMine.option != null) return;
@@ -548,6 +574,18 @@ if (quizSlider) {
 }
 const quizLock = document.getElementById('quiz-bet-lock');
 if (quizLock) quizLock.addEventListener('click', () => sendQuizBet(true));
+['eki-roll', 'eki-start', 'eki-claim'].forEach((id) => {
+  const button = document.getElementById(id);
+  if (!button) return;
+  const type = id === 'eki-roll' ? 'roll' : id === 'eki-start' ? 'start' : 'claim';
+  button.addEventListener('click', () => sendEki(type));
+});
+const ekiFail = document.getElementById('eki-fail');
+if (ekiFail) ekiFail.addEventListener('click', () => sendEki('fail'));
+document.addEventListener('eki-landed', (event) => {
+  if (!event.target || event.target.id !== 'eki-die') return;
+  paintPlayerEki();
+});
 document.querySelectorAll('#quiz-bet [data-bet]').forEach((button) => {
   button.addEventListener('click', () => {
     if (!quizSlider || button.disabled) return;
@@ -618,6 +656,35 @@ if (isHost) {
     document.getElementById('abort').hidden = true;
     socket.emit('return_to_lobby');
   });
+  const ekiApply = document.getElementById('eki-apply');
+  const ekiSkip = document.getElementById('eki-skip');
+  const ekiSkipYes = document.getElementById('eki-skip-yes');
+  const ekiSkipNo = document.getElementById('eki-skip-no');
+  if (ekiApply) {
+    ekiApply.addEventListener('click', () => {
+      const cells = [];
+      document.querySelectorAll('[data-eki-cell]').forEach((input) => {
+        if (input.value.trim() === '') return;
+        cells.push({ id: input.dataset.ekiCell, cell: Number(input.value) });
+      });
+      socket.emit('player_action', { type: 'cells', cells });
+    });
+  }
+  if (ekiSkip && ekiSkipYes && ekiSkipNo) {
+    ekiSkip.addEventListener('click', () => {
+      ekiSkip.hidden = true;
+      document.getElementById('eki-skip-confirm').hidden = false;
+    });
+    ekiSkipNo.addEventListener('click', () => {
+      document.getElementById('eki-skip-confirm').hidden = true;
+      ekiSkip.hidden = false;
+    });
+    ekiSkipYes.addEventListener('click', () => {
+      document.getElementById('eki-skip-confirm').hidden = true;
+      ekiSkip.hidden = false;
+      socket.emit('player_action', { type: 'skip' });
+    });
+  }
 
   const lightsToggle = document.getElementById('lights-toggle');
   const lightsSlider = document.getElementById('lights-brightness');
@@ -720,7 +787,7 @@ socket.on('game_start', (payload) => {
     room.roundStatus = 'playing';
     room.activeGame = gameId;
   }
-  if (gameId === 'hotbomb' || gameId === 'quiz') {
+  if (gameId === 'hotbomb' || gameId === 'quiz' || gameId === 'ekivoki') {
     show('play');
     render();
     return;
@@ -758,6 +825,25 @@ socket.on('quiz_mine', (next) => {
     flashQuizResult(quizMine.lastOk);
   }
   if (me && room && room.roundStatus === 'playing') paintPlayerQuiz();
+});
+
+socket.on('ekivoki_state', (next) => {
+  const prev = eki;
+  eki = next && next.phase ? next : null;
+  if (eki) {
+    eki.at = Date.now();
+    applyEkiScores(room, eki);
+  } else {
+    ekiMine = null;
+  }
+  reactEki(prev, eki, me, buzz);
+  if (me && room && (room.roundStatus === 'playing' || !eki)) render();
+  else if (isHost) paintEkiHost(eki, room);
+});
+
+socket.on('ekivoki_mine', (next) => {
+  ekiMine = next || null;
+  if (me && room && room.roundStatus === 'playing') paintPlayerEki();
 });
 
 function hideBoard() {

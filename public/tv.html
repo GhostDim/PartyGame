@@ -59,11 +59,32 @@
       <div id="tv-quiz-bets" class="quiz-bets"></div>
       <div id="tv-quiz-podium" class="bomb-winners quiz-podium" hidden></div>
     </div>
+    <div id="tv-ekivoki" hidden>
+      <div class="eki-stage">
+        <aside id="tv-eki-queue" class="eki-rail eki-queue" aria-label="Очередь хода"></aside>
+        <div class="eki-board-fit">
+          <div id="tv-eki-board" class="eki-board"></div>
+        </div>
+        <aside id="tv-eki-now" class="eki-now" aria-live="polite">
+          <div id="tv-eki-die" class="die-scene" hidden></div>
+          <p id="tv-eki-who" class="eki-now-who"></p>
+          <p id="tv-eki-line" class="eki-now-line"></p>
+          <div id="tv-eki-waitspin" class="eki-waitspin" hidden>
+            <span class="eki-spin" aria-hidden="true"></span>
+            <span>знакомится с заданием</span>
+          </div>
+          <p id="tv-eki-clock" class="eki-clock" hidden></p>
+          <div id="tv-eki-bar" class="eki-bar" hidden><span></span></div>
+          <div id="tv-eki-podium" class="bomb-winners eki-podium" hidden></div>
+        </aside>
+      </div>
+    </div>
   </div>
   <script src="/socket.io/socket.io.js"></script>
   <script src="/common.js"></script>
   <script src="/bomb.js"></script>
   <script src="/quiz.js"></script>
+  <script src="/ekivoki.js"></script>
   <script src="/tv.js"></script>
 </body>
 </html>

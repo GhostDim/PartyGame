@@ -87,6 +87,31 @@
         <p id="quiz-ready" class="quiz-ready" hidden></p>
         <div id="quiz-podium" class="bomb-winners quiz-podium" hidden></div>
       </div>
+      <div id="play-ekivoki" hidden>
+        <p id="eki-pos" class="eki-pos"></p>
+        <p id="eki-wait" class="eki-wait" hidden></p>
+        <div id="eki-die" class="die-scene" hidden></div>
+        <p id="eki-face" class="eki-face" hidden></p>
+        <div id="eki-task" class="eki-task" hidden>
+          <p id="eki-mode" class="eki-mode"></p>
+          <p id="eki-hint" class="eki-hint"></p>
+          <p id="eki-lead" class="eki-lead" hidden></p>
+          <p id="eki-word" class="eki-word" hidden></p>
+          <p id="eki-theme" class="eki-theme" hidden></p>
+          <ol id="eki-words" class="eki-words" hidden></ol>
+          <p id="eki-answer" class="eki-answer" hidden></p>
+        </div>
+        <p id="eki-clock" class="eki-clock" hidden></p>
+        <div id="eki-bar" class="eki-bar" hidden><span></span></div>
+        <button id="eki-roll" class="eki-roll" type="button" hidden>Бросить кубик</button>
+        <button id="eki-start" class="eki-start" type="button" hidden>Старт</button>
+        <div id="eki-judge" class="eki-actions" hidden>
+          <button id="eki-claim" class="eki-ok" type="button">Забрать очки</button>
+          <button id="eki-fail" class="danger" type="button">Не успел</button>
+        </div>
+        <ol id="eki-list" class="eki-list" hidden></ol>
+        <div id="eki-podium" class="bomb-winners eki-podium" hidden></div>
+      </div>
     </section>
   </div>
   <button id="open-rank" class="fab fab-rank" type="button" hidden aria-label="Кубки">
@@ -123,6 +148,7 @@
   <script src="/common.js"></script>
   <script src="/bomb.js"></script>
   <script src="/quiz.js"></script>
+  <script src="/ekivoki.js"></script>
   <script src="/player.js"></script>
 </body>
 </html>

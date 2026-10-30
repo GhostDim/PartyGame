@@ -8,6 +8,7 @@ const { Lights } = require('./lib/lights');
 const { Audio } = require('./lib/audio');
 const { HotBomb } = require('./games/hotbomb');
 const { Quiz } = require('./games/quiz');
+const { Ekivoki } = require('./games/ekivoki');
 
 const PORT = 3000;
 const ADMIN_PASSWORD = 'admin';
@@ -72,6 +73,10 @@ function sendGame(socket) {
   if (game instanceof Quiz) {
     socket.emit('quiz_state', game.view());
     if (socket.data.playerId) socket.emit('quiz_mine', game.mine(socket.data.playerId));
+  }
+  if (game instanceof Ekivoki) {
+    socket.emit('ekivoki_state', game.view());
+    if (socket.data.playerId) socket.emit('ekivoki_mine', game.mine(socket.data.playerId));
   }
 }
 
@@ -211,6 +216,10 @@ io.on('connection', (socket) => {
       socket.emit('admin_notice', { message: 'Для викторины нужен игрок в сети' });
       return;
     }
+    if (gameId === 'ekivoki' && onlineCount() < 2) {
+      socket.emit('admin_notice', { message: 'Для «Экивоки» нужны минимум 2 игрока в сети' });
+      return;
+    }
     const result = state.start();
     if (!result.ok) {
       socket.emit('admin_notice', { message: result.error });
@@ -232,6 +241,16 @@ io.on('connection', (socket) => {
       });
       if (!game.init()) {
         abortGame('Не удалось начать викторину');
+        return;
+      }
+    } else if (result.game.id === 'ekivoki') {
+      game = new Ekivoki(io, state, {
+        onScores: broadcast,
+        onAbort: abortGame,
+      });
+      if (!game.init()) {
+        const message = game.problem || 'Не удалось начать экивоки';
+        abortGame(message);
         return;
       }
     }
