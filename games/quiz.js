@@ -2,11 +2,21 @@ const fs = require('fs');
 const path = require('path');
 
 const COUNT_MS = 1000;
-const REVEAL_MS = 5000;
-const MINI_INTRO_MS = 4000;
-const MINI_CARD_MS = 3200;
-const MINI_FLASH_MS = 900;
-const BET_MS = 15000;
+const REVEAL_MS = 7000;
+const OPTIONS_GAP_MS = 900;
+const READ_BASE_MS = 1200;
+const READ_PER_CHAR_MS = 65;
+const READ_MIN_MS = 2400;
+const READ_MAX_MS = 6500;
+const BRIEF_BASE_MS = 3200;
+const BRIEF_PER_CHAR_MS = 42;
+const BRIEF_MIN_MS = 7000;
+const BRIEF_MAX_MS = 10000;
+const EMPTY_BET_MS = 2500;
+const SWIPE_MS = 20000;
+const WRONG_FREEZE_MS = 700;
+const BET_MS = 10000;
+const FINAL_ANSWER_MS = 60000;
 const CLOSE_GAP = 450;
 const SWIPE_POINTS = 50;
 const QUESTION_COUNT = 9;
@@ -30,6 +40,19 @@ function take(list, count) {
   const copy = list.slice();
   shuffle(copy);
   return copy.slice(0, count);
+}
+
+function pace(text, base, per, min, max) {
+  const chars = Array.from(String(text || '')).length;
+  return Math.max(min, Math.min(max, base + chars * per));
+}
+
+function readMs(text) {
+  return pace(text, READ_BASE_MS, READ_PER_CHAR_MS, READ_MIN_MS, READ_MAX_MS);
+}
+
+function briefMs(text) {
+  return pace(text, BRIEF_BASE_MS, BRIEF_PER_CHAR_MS, BRIEF_MIN_MS, BRIEF_MAX_MS);
 }
 
 function usableQuestion(row) {
@@ -91,6 +114,10 @@ class Quiz {
     this.answers = new Map();
     this.answerSeq = 0;
     this.swipes = new Map();
+    this.progress = new Map();
+    this.holds = new Map();
+    this.roundPoints = new Map();
+    this.roundHits = new Map();
     this.betAmount = new Map();
     this.betLocked = new Set();
     this.revealRows = null;
@@ -157,6 +184,7 @@ class Quiz {
       if (!this.base.has(playerId)) this.base.set(playerId, player.score);
     }
     if (this.phase === 'bet') this.lockEmptyBets();
+    if (this.phase === 'mini') this.ensureProgress(playerId);
     if (!this.guardOnline()) return;
     this.emit(false);
     if (this.phase === 'bet') this.maybeCloseEarly();
@@ -170,8 +198,11 @@ class Quiz {
     this.betAmount.delete(playerId);
     this.betLocked.delete(playerId);
     this.base.delete(playerId);
+    this.clearHold(playerId);
+    this.progress.delete(playerId);
     if (!this.guardOnline()) return;
     this.emit(false);
+    if (this.phase === 'mini') this.maybeFinishMini();
     this.maybeCloseEarly();
   }
 
@@ -194,6 +225,7 @@ class Quiz {
     this.freshToken();
     if (this.later) clearTimeout(this.later);
     this.later = null;
+    this.clearHolds();
     this.io.emit('quiz_state', null);
   }
 
@@ -208,11 +240,34 @@ class Quiz {
   }
 
   swipe(playerId, up) {
-    if (this.phase !== 'mini' || this.swipes.has(playerId)) return;
-    if (typeof up !== 'boolean') return;
-    this.swipes.set(playerId, up);
+    if (this.phase !== 'mini' || typeof up !== 'boolean') return;
+    const prog = this.progress.get(playerId);
+    const cards = this.miniCards();
+    if (!prog || prog.busy || prog.index >= cards.length) return;
+    const card = cards[prog.index];
+    const ok = up === card.yes;
+    prog.seq += 1;
+    prog.lastOk = ok;
+    if (ok) {
+      const gained = this.grant(playerId, SWIPE_POINTS);
+      this.roundPoints.set(playerId, (this.roundPoints.get(playerId) || 0) + gained);
+      this.roundHits.set(playerId, (this.roundHits.get(playerId) || 0) + 1);
+      prog.index += 1;
+      this.emit(false);
+      this.maybeFinishMini();
+      return;
+    }
+    prog.busy = true;
     this.emit(false);
-    this.maybeCloseEarly();
+    this.hold(playerId, () => {
+      const row = this.progress.get(playerId);
+      if (!row) return;
+      row.busy = false;
+      row.lastOk = null;
+      row.index += 1;
+      this.emit(false);
+      this.maybeFinishMini();
+    });
   }
 
   bet(playerId, amount, lock) {
@@ -234,8 +289,6 @@ class Quiz {
     if (this.soon || this.dead) return;
     if ((this.phase === 'ask' || this.phase === 'final') && this.everyone((id) => this.answers.has(id))) {
       this.closeSoon(() => this.closeAsk());
-    } else if (this.phase === 'mini' && this.everyone((id) => this.swipes.has(id))) {
-      this.closeSoon(() => this.closeCard());
     } else if (this.phase === 'bet' && this.someoneCanBet() && this.everyone((id) => this.betLocked.has(id))) {
       this.closeSoon(() => this.closeBet());
     }
@@ -251,9 +304,9 @@ class Quiz {
     this.answers.clear();
     this.revealRows = null;
     this.soon = false;
-    if (step.type === 'question') this.startCount(() => this.openAsk());
+    if (step.type === 'question') this.startCount(() => this.openRead('ask'));
     else if (step.type === 'mini') this.openMini();
-    else this.startCount(() => this.openBet());
+    else this.startCount(() => this.openFinalRules());
   }
 
   startCount(done) {
@@ -278,6 +331,38 @@ class Quiz {
       else if (this.afterCount) this.afterCount();
     }, COUNT_MS);
     this.timer.unref();
+  }
+
+  openRead(next) {
+    if (this.dead || !this.guardOnline()) return;
+    const step = this.step();
+    this.phase = 'read';
+    this.answers.clear();
+    this.revealRows = null;
+    this.soon = false;
+    const text = step && step.question ? step.question.text : '';
+    this.arm(readMs(text), () => {
+      if (next === 'bet') this.openBet();
+      else this.openGap('ask');
+    });
+    this.emit(false);
+  }
+
+  openGap(next) {
+    if (this.dead || !this.guardOnline()) return;
+    this.phase = 'gap';
+    this.soon = false;
+    const token = this.freshToken();
+    this.limit = 0;
+    this.endsAt = 0;
+    this.timer = setTimeout(() => {
+      if (this.dead || token !== this.token) return;
+      // Варианты выходят здесь. Позже на это место встанет сигнал динамика.
+      if (next === 'final') this.openFinal();
+      else this.openAsk();
+    }, OPTIONS_GAP_MS);
+    this.timer.unref();
+    this.emit(false);
   }
 
   openAsk() {
@@ -310,38 +395,87 @@ class Quiz {
     this.swipes.clear();
     this.revealRows = null;
     this.soon = false;
-    this.arm(MINI_INTRO_MS, () => this.openCard());
+    const step = this.step();
+    const lines = step && step.theme ? this.miniLines(step.theme) : [];
+    this.arm(briefMs(this.linesText(lines)), () => this.openRun());
     this.emit(false);
   }
 
-  openCard() {
+  openRun() {
     if (this.dead || !this.guardOnline()) return;
-    const step = this.step();
-    const cards = step && step.theme ? step.theme.cards : [];
-    if (this.cardIndex >= cards.length) {
-      this.advance();
-      return;
-    }
     this.phase = 'mini';
+    this.clearHolds();
+    this.progress = new Map();
+    this.roundPoints = new Map();
+    this.roundHits = new Map();
+    for (const id of this.roster) this.ensureProgress(id);
     this.swipes.clear();
     this.revealRows = null;
     this.soon = false;
-    this.arm(MINI_CARD_MS, () => this.closeCard());
+    this.arm(SWIPE_MS, () => this.finishMini());
     this.emit(false);
   }
 
-  closeCard() {
+  finishMini() {
     if (this.phase !== 'mini') return;
-    this.soon = false;
-    this.scoreCard();
-    this.phase = 'mini_flash';
+    this.clearHolds();
+    this.phase = 'mini_board';
+    const token = this.freshToken();
     this.endsAt = 0;
     this.limit = 0;
+    this.timer = setTimeout(() => {
+      if (this.dead || token !== this.token || this.phase !== 'mini_board') return;
+      this.advance();
+    }, REVEAL_MS);
+    this.timer.unref();
     this.emit(true);
-    this.arm(MINI_FLASH_MS, () => {
-      this.cardIndex += 1;
-      this.openCard();
+  }
+
+  maybeFinishMini() {
+    if (this.phase !== 'mini') return;
+    const total = this.miniCards().length;
+    if (!total) {
+      this.finishMini();
+      return;
+    }
+    const done = this.everyone((id) => {
+      const prog = this.progress.get(id);
+      return prog && !prog.busy && prog.index >= total;
     });
+    if (done) this.finishMini();
+  }
+
+  ensureProgress(playerId) {
+    if (!playerId || this.progress.has(playerId)) return;
+    this.progress.set(playerId, { index: 0, busy: false, seq: 0, lastOk: null });
+  }
+
+  hold(playerId, fn) {
+    this.clearHold(playerId);
+    const timer = setTimeout(() => {
+      this.holds.delete(playerId);
+      if (this.dead || this.phase !== 'mini') return;
+      fn();
+    }, WRONG_FREEZE_MS);
+    timer.unref();
+    this.holds.set(playerId, timer);
+  }
+
+  clearHold(playerId) {
+    const timer = this.holds.get(playerId);
+    if (timer) clearTimeout(timer);
+    this.holds.delete(playerId);
+  }
+
+  clearHolds() {
+    for (const timer of this.holds.values()) clearTimeout(timer);
+    this.holds.clear();
+  }
+
+  miniCards() {
+    const step = this.step();
+    if (!step || step.type !== 'mini' || !step.theme) return [];
+    return step.theme.cards;
   }
 
   openBet() {
@@ -354,7 +488,7 @@ class Quiz {
     this.soon = false;
     this.lockEmptyBets();
     const readOnly = !this.someoneCanBet();
-    this.arm(readOnly ? MINI_INTRO_MS : BET_MS, () => this.closeBet());
+    this.arm(readOnly ? EMPTY_BET_MS : BET_MS, () => this.closeBet());
     this.emit(false);
     if (!readOnly) this.maybeCloseEarly();
   }
@@ -375,18 +509,26 @@ class Quiz {
   closeBet() {
     if (this.phase !== 'bet') return;
     this.soon = false;
-    this.openFinal();
+    this.openGap('final');
+  }
+
+  openFinalRules() {
+    if (this.dead || !this.guardOnline()) return;
+    this.phase = 'final_rules';
+    this.answers.clear();
+    this.revealRows = null;
+    this.soon = false;
+    this.arm(briefMs(this.linesText(this.finalLines())), () => this.openRead('bet'));
+    this.emit(false);
   }
 
   openFinal() {
     if (this.dead || !this.guardOnline()) return;
-    const step = this.step();
     this.phase = 'final';
     this.answers.clear();
     this.revealRows = null;
     this.soon = false;
-    const seconds = step && step.question ? step.question.seconds : 20;
-    this.arm(seconds * 1000, () => this.closeAsk());
+    this.arm(FINAL_ANSWER_MS, () => this.closeAsk());
     this.emit(false);
   }
 
@@ -429,7 +571,7 @@ class Quiz {
       else if (index === 1) delta = 200;
       awarded.set(row.id, {
         delta,
-        place: finalRound ? 0 : index + 1,
+        place: index + 1,
       });
     });
     this.revealRows = this.roster.map((id) => {
@@ -444,22 +586,6 @@ class Quiz {
         delta: this.grant(id, delta),
         ok: !!hit,
         place: hit ? hit.place : 0,
-      };
-    });
-  }
-
-  scoreCard() {
-    const card = this.currentCard();
-    const yes = !!(card && card.yes);
-    this.revealRows = this.roster.map((id) => {
-      const picked = this.swipes.has(id) ? this.swipes.get(id) : null;
-      const ok = picked !== null && picked === yes;
-      return {
-        id,
-        option: null,
-        delta: ok ? this.grant(id, SWIPE_POINTS) : 0,
-        ok,
-        place: 0,
       };
     });
   }
@@ -482,12 +608,6 @@ class Quiz {
 
   step() {
     return this.steps[this.stepIndex] || null;
-  }
-
-  currentCard() {
-    const step = this.step();
-    if (!step || step.type !== 'mini') return null;
-    return step.theme.cards[this.cardIndex] || null;
   }
 
   nameOf(id) {
@@ -516,15 +636,16 @@ class Quiz {
     return false;
   }
 
-  closeSoon(fn) {
+  closeSoon(fn, wait) {
     if (this.soon || this.dead) return;
     this.soon = true;
     const token = this.freshToken();
+    const gap = Number.isFinite(wait) ? wait : CLOSE_GAP;
     this.timer = setTimeout(() => {
       this.soon = false;
       if (this.dead || token !== this.token) return;
       fn();
-    }, CLOSE_GAP);
+    }, gap);
     this.timer.unref();
   }
 
@@ -576,54 +697,60 @@ class Quiz {
 
   mine(playerId) {
     const answer = this.answers.get(playerId);
+    const swipe = this.phase === 'mini' || this.phase === 'mini_board';
+    const cards = swipe ? this.miniCards() : [];
+    const prog = this.progress.get(playerId);
+    const card = this.phase === 'mini' && prog && cards[prog.index] ? cards[prog.index] : null;
     return {
       option: answer ? answer.option : null,
-      up: this.swipes.has(playerId) ? this.swipes.get(playerId) : null,
+      up: null,
       bet: this.betAmount.has(playerId) ? this.betAmount.get(playerId) : null,
       betLocked: this.betLocked.has(playerId),
+      card: card ? card.text : null,
+      index: prog ? prog.index : 0,
+      total: cards.length,
+      hits: swipe ? (this.roundHits.get(playerId) || 0) : null,
+      busy: !!(prog && prog.busy),
+      seq: prog ? prog.seq : 0,
+      lastOk: prog ? prog.lastOk : null,
     };
   }
 
   kicker() {
     const step = this.step();
     if (this.phase === 'over') return 'Итог';
+    if (this.phase === 'mini_board') return 'Итог свайпа';
     if (!step) return 'Викторина';
-    if (step.type === 'mini') {
-      if (this.phase === 'mini_intro') return 'Свайп';
-      return 'Свайп ' + (this.cardIndex + 1) + ' из ' + step.theme.cards.length;
-    }
+    if (step.type === 'mini') return 'Свайп';
     if (step.type === 'final') return 'Финал';
     return 'Вопрос ' + step.number + ' из ' + QUESTION_COUNT;
   }
 
   hint() {
-    const step = this.step();
     if (this.phase === 'count') return 'Приготовьтесь';
+    if (this.phase === 'read' || this.phase === 'gap') return '';
     if (this.phase === 'ask') return 'Верный ответ: 300 первому, 200 второму, 100 остальным';
     if (this.phase === 'reveal' || this.phase === 'final_reveal') return 'Верный ответ подсвечен';
-    if (this.phase === 'mini_intro' && step && step.theme) return step.theme.hint;
-    if (this.phase === 'mini' && step && step.theme) {
-      return 'Вверх — ' + step.theme.up + '. Вниз — ' + step.theme.down + '.';
-    }
-    if (this.phase === 'mini_flash' && step && step.theme) {
-      const card = this.currentCard();
-      if (!card) return '';
-      return card.yes ? '↑ ' + step.theme.up : '↓ ' + step.theme.down;
-    }
-    if (this.phase === 'bet') return 'Поставьте очки этой викторины. Потом появятся варианты.';
+    if (this.phase === 'bet') return '';
     if (this.phase === 'final') return 'Выберите ответ';
     if (this.phase === 'over') return 'Кубки за места уже у аватаров. Ведущий вернёт всех в лобби';
     return '';
   }
 
   showingResults() {
-    return this.phase === 'reveal' || this.phase === 'final_reveal' || this.phase === 'mini_flash';
+    return this.phase === 'reveal' || this.phase === 'final_reveal';
   }
 
   readyIds() {
     if (this.phase === 'ask' || this.phase === 'final') return [...this.answers.keys()];
     if (this.phase === 'bet') return [...this.betLocked];
-    if (this.phase === 'mini') return [...this.swipes.keys()];
+    if (this.phase === 'mini') {
+      const total = this.miniCards().length;
+      return this.roster.filter((id) => {
+        const prog = this.progress.get(id);
+        return prog && !prog.busy && prog.index >= total;
+      });
+    }
     return [];
   }
 
@@ -638,12 +765,17 @@ class Quiz {
         cups: this.state.cupsPublic(player),
         purse: this.purse(id),
         online: !!(player && player.isOnline),
+        seen: this.phase === 'mini' && this.progress.has(id) ? this.progress.get(id).index : null,
+        cards: this.phase === 'mini' ? this.miniCards().length : null,
       };
     });
   }
 
   betView() {
-    if (this.phase !== 'bet' && this.phase !== 'final' && this.phase !== 'final_reveal') return null;
+    const step = this.step();
+    const showBets = this.phase === 'bet' || this.phase === 'final' || this.phase === 'final_reveal'
+      || (this.phase === 'gap' && step && step.type === 'final');
+    if (!showBets) return null;
     return this.roster.map((id) => ({
       id,
       amount: this.betAmount.get(id) || 0,
@@ -656,6 +788,79 @@ class Quiz {
     return this.rosterView().sort((a, b) => b.score - a.score || a.nickname.localeCompare(b.nickname, 'ru'));
   }
 
+  miniLines(theme) {
+    return [
+      { text: 'Да — ' + theme.up, tone: 'up' },
+      { text: 'Нет — ' + theme.down, tone: 'down' },
+      { text: (SWIPE_MS / 1000) + ' секунд. Верный — сразу дальше и ' + SWIPE_POINTS + ' очков. Ошибка — короткая пауза.' },
+    ];
+  }
+
+  finalLines() {
+    return [
+      { text: 'Ставите очки, набранные в этой викторине.' },
+      { text: 'Сначала вопрос. Варианты — после ставки.' },
+      { text: 'Верный ответ приносит ставку, ошибка её забирает.' },
+    ];
+  }
+
+  linesText(lines) {
+    return (lines || []).map((line) => line.text).join(' ');
+  }
+
+  ruleLines() {
+    const step = this.step();
+    if (this.phase === 'mini_intro' && step && step.theme) return this.miniLines(step.theme);
+    if (this.phase === 'final_rules') return this.finalLines();
+    if (this.phase === 'bet' && step && step.question) return [{ text: step.question.text }];
+    return null;
+  }
+
+  boardRow(id, place, points, extra) {
+    const player = this.state.players.get(id);
+    const more = extra || {};
+    return {
+      id,
+      place,
+      points,
+      hits: more.hits == null ? null : more.hits,
+      total: more.total == null ? null : more.total,
+      nickname: player ? player.nickname : 'Игрок',
+      avatar: player ? player.avatar : '❔',
+    };
+  }
+
+  speedBoard() {
+    const rows = (this.revealRows || []).filter((row) => row.ok && row.place > 0);
+    rows.sort((a, b) => a.place - b.place);
+    return rows.map((row) => this.boardRow(row.id, row.place, row.delta));
+  }
+
+  miniBoard() {
+    const total = this.miniCards().length;
+    const rows = this.roster.map((id) => ({
+      id,
+      points: this.roundPoints.get(id) || 0,
+      hits: this.roundHits.get(id) || 0,
+    }));
+    rows.sort((a, b) => b.points - a.points || b.hits - a.hits || this.nameOf(a.id).localeCompare(this.nameOf(b.id), 'ru'));
+    let place = 0;
+    let prev = null;
+    return rows.map((row, index) => {
+      if (prev == null || row.points !== prev) {
+        place = index + 1;
+        prev = row.points;
+      }
+      return this.boardRow(row.id, place, row.points, { hits: row.hits, total });
+    });
+  }
+
+  boardView() {
+    if (this.phase === 'reveal' || this.phase === 'final_reveal') return this.speedBoard();
+    if (this.phase === 'mini' || this.phase === 'mini_board') return this.miniBoard();
+    return null;
+  }
+
   view() {
     const step = this.step();
     const question = step && step.question ? step.question : null;
@@ -666,10 +871,12 @@ class Quiz {
       || this.phase === 'final_reveal'
     );
     const showCorrect = this.phase === 'reveal' || this.phase === 'final_reveal';
-    const card = this.currentCard();
     let text = null;
-    if (this.phase !== 'count' && this.phase !== 'over' && step) {
-      if (step.type === 'mini') text = this.phase === 'mini_intro' ? step.theme.title : (card ? card.text : null);
+    if (this.phase === 'final_rules') text = 'Как устроен финал';
+    else if (this.phase === 'mini_board') text = 'Кто как ответил';
+    else if (this.phase === 'bet') text = 'Поставьте ставку';
+    else if (this.phase !== 'count' && this.phase !== 'over' && step) {
+      if (step.type === 'mini') text = step.theme.title;
       else if (question) text = question.text;
     }
     return {
@@ -678,16 +885,18 @@ class Quiz {
       hint: this.hint(),
       count: this.phase === 'count' ? this.count : null,
       text,
+      rules: this.ruleLines(),
       options: showOptions ? question.options.slice() : null,
       correct: showCorrect && question ? question.correct : null,
       ready: this.readyIds(),
       results: this.showingResults() ? this.revealRows : null,
+      board: this.boardView(),
       limit: this.endsAt ? this.limit : null,
       left: this.endsAt ? Math.max(0, this.endsAt - Date.now()) : null,
       roster: this.rosterView(),
       up: step && step.type === 'mini' ? step.theme.up : null,
       down: step && step.type === 'mini' ? step.theme.down : null,
-      cardYes: this.phase === 'mini_flash' && card ? card.yes : null,
+      cardYes: null,
       bets: this.betView(),
       podium: this.podium(),
     };

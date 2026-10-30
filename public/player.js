@@ -478,14 +478,15 @@ function sendQuizAnswer(option) {
   if (!quiz || (quiz.phase !== 'ask' && quiz.phase !== 'final')) return;
   if (quizMine && quizMine.option != null) return;
   quizMine = Object.assign({}, quizMine, { option });
+  buzz(30);
   socket.emit('player_action', { type: 'answer', option });
   paintPlayerQuiz();
 }
 
 function sendQuizSwipe(up) {
   if (!quiz || quiz.phase !== 'mini') return;
-  if (quizMine && quizMine.up != null) return;
-  quizMine = Object.assign({}, quizMine, { up });
+  if (quizMine && (quizMine.busy || quizMine.wait || !quizMine.card)) return;
+  quizMine = Object.assign({}, quizMine, { wait: true });
   buzz(30);
   socket.emit('player_action', { type: 'swipe', up });
   paintPlayerQuiz();
@@ -751,7 +752,11 @@ socket.on('quiz_state', (next) => {
 });
 
 socket.on('quiz_mine', (next) => {
+  const prev = quizMine;
   quizMine = next || null;
+  if (prev && quizMine && quizMine.seq !== prev.seq && typeof quizMine.lastOk === 'boolean') {
+    flashQuizResult(quizMine.lastOk);
+  }
   if (me && room && room.roundStatus === 'playing') paintPlayerQuiz();
 });
 

@@ -29,7 +29,7 @@ function quizReadyText(view) {
   if (!online) return '';
   const done = (view.ready || []).length;
   if (view.phase === 'ask' || view.phase === 'final') return 'Ответили ' + done + ' из ' + online;
-  if (view.phase === 'mini') return 'Свайпнули ' + done + ' из ' + online;
+  if (view.phase === 'mini') return 'Закончили ' + done + ' из ' + online;
   if (view.phase === 'bet') return 'Ставки ' + done + ' из ' + online;
   return '';
 }
@@ -37,9 +37,14 @@ function quizReadyText(view) {
 function quizStatus(view, tvMode) {
   if (!tvMode) return 'Игра идёт на телефонах';
   if (!view || view.phase === 'count') return 'Приготовьтесь';
+  if (view.phase === 'read') return 'Читайте вопрос';
+  if (view.phase === 'gap') return 'Сейчас варианты';
   if (view.phase === 'ask' || view.phase === 'final') return 'Время отвечать';
   if (view.phase === 'reveal' || view.phase === 'final_reveal') return 'Разбор';
-  if (view.phase === 'mini_intro' || view.phase === 'mini' || view.phase === 'mini_flash') return 'Свайп на телефонах';
+  if (view.phase === 'mini_board') return 'Итог свайпа';
+  if (view.phase === 'final_rules') return 'Правила финала';
+  if (view.phase === 'mini_intro') return 'Правила свайпа';
+  if (view.phase === 'mini') return 'Свайп на телефонах';
   if (view.phase === 'bet') return 'Ставки';
   if (view.phase === 'over') return 'Итог';
   return 'Викторина';
@@ -51,11 +56,27 @@ function setQuizText(id, value) {
   node.textContent = value;
 }
 
-function optionKey(view, mine) {
+function optionKey(view) {
   const texts = (view.options || []).join('|');
-  const mineOpt = mine && mine.option != null ? String(mine.option) : '';
   const resultKey = (view.results || []).map((row) => row.id + ':' + row.option + ':' + row.delta).join(',');
-  return view.phase + '#' + texts + '#' + view.correct + '#' + mineOpt + '#' + resultKey;
+  return view.phase + '#' + texts + '#' + view.correct + '#' + resultKey;
+}
+
+function paintRules(container, rules) {
+  if (!container) return;
+  if (!rules || !rules.length) {
+    container.hidden = true;
+    container.dataset.key = '';
+    return;
+  }
+  container.hidden = false;
+  const key = rules.map((line) => (line.tone || '') + ':' + line.text).join('|');
+  if (container.dataset.key === key && container.childElementCount) return;
+  container.dataset.key = key;
+  clearNode(container);
+  rules.forEach((line) => {
+    container.appendChild(make('li', line.tone ? 'is-' + line.tone : '', line.text));
+  });
 }
 
 function paintOptions(container, view, mine, tv) {
@@ -63,10 +84,15 @@ function paintOptions(container, view, mine, tv) {
   if (!view || !view.options) {
     container.hidden = true;
     container.dataset.key = '';
+    container.classList.remove('is-fresh');
     return;
   }
+  const appear = container.hidden;
   container.hidden = false;
-  const key = optionKey(view, tv ? null : mine);
+  const incoming = appear && (view.phase === 'ask' || view.phase === 'final');
+  if (incoming) container.classList.add('is-fresh');
+  else if (view.phase !== 'ask' && view.phase !== 'final') container.classList.remove('is-fresh');
+  const key = optionKey(view);
   if (container.dataset.key !== key) {
     container.dataset.key = key;
     clearNode(container);
@@ -77,6 +103,7 @@ function paintOptions(container, view, mine, tv) {
       button.append(
         make('span', 'quiz-letter', QUIZ_LETTERS[index] || ''),
         make('span', 'quiz-label', text),
+        make('span', 'quiz-lock', 'Принято'),
         make('span', 'quiz-picks')
       );
       container.appendChild(button);
@@ -85,11 +112,14 @@ function paintOptions(container, view, mine, tv) {
   const reveal = view.correct != null && (view.phase === 'reveal' || view.phase === 'final_reveal');
   const locked = !!(mine && mine.option != null);
   const open = view.phase === 'ask' || view.phase === 'final';
+  const mineIndex = !tv && locked ? mine.option : null;
   Array.from(container.children).forEach((button, index) => {
     button.disabled = tv ? false : (!open || locked);
     button.classList.toggle('is-right', reveal && index === view.correct);
-    button.classList.toggle('is-dim', reveal && index !== view.correct);
-    button.classList.toggle('is-mine', !tv && locked && mine.option === index);
+    button.classList.toggle('is-mine', mineIndex === index);
+    button.classList.toggle('is-dim', (reveal && index !== view.correct) || (mineIndex != null && !reveal && index !== mineIndex));
+    const lock = button.querySelector('.quiz-lock');
+    if (lock) lock.hidden = mineIndex !== index || reveal;
     const picks = button.querySelector('.quiz-picks');
     if (!picks) return;
     const people = reveal ? (view.results || []).filter((row) => row.option === index) : [];
@@ -104,6 +134,44 @@ function paintOptions(container, view, mine, tv) {
       chip.title = seat.nickname + (row.delta ? ' ' + quizSigned(row.delta) : '');
       picks.appendChild(chip);
     });
+  });
+}
+
+function paintBoard(container, view) {
+  if (!container) return;
+  const rows = view && view.board;
+  if (!rows) {
+    container.hidden = true;
+    container.dataset.key = '';
+    container.classList.remove('is-rank');
+    return;
+  }
+  container.hidden = false;
+  const ranked = rows.some((row) => row.hits != null);
+  container.classList.toggle('is-rank', ranked);
+  container.setAttribute('aria-label', ranked ? 'Рейтинг свайпа' : 'Кто ответил верно');
+  const key = rows.map((row) => row.id + ':' + row.place + ':' + row.points + ':' + (row.hits == null ? '' : row.hits)).join(',') || 'empty';
+  if (container.dataset.key === key && container.childElementCount) return;
+  container.dataset.key = key;
+  clearNode(container);
+  if (!rows.length) {
+    container.appendChild(make('li', 'is-empty', 'Верно не ответил никто'));
+    return;
+  }
+  rows.forEach((row) => {
+    const item = make('li', row.place === 1 ? 'is-first' : '');
+    const body = make('span', 'quiz-board-body');
+    body.appendChild(make('strong', null, row.nickname));
+    if (row.hits != null) {
+      body.appendChild(make('span', 'quiz-how', row.hits + ' из ' + row.total));
+    }
+    item.append(
+      make('span', 'quiz-place', ranked ? row.place + ' место' : String(row.place)),
+      make('span', 'quiz-board-face', row.avatar),
+      body
+    );
+    if (row.points != null) item.appendChild(make('span', 'quiz-points', pointsLabel(row.points)));
+    container.appendChild(item);
   });
 }
 
@@ -135,10 +203,10 @@ function paintPodium(container, podium) {
 function paintRoster(container, view) {
   if (!container) return;
   const roster = (view && view.roster) || [];
-  const hidden = !view || view.phase === 'over';
+  const hidden = !view || view.phase === 'over' || view.phase === 'mini' || view.phase === 'mini_board';
   container.hidden = hidden;
   if (hidden) return;
-  const key = roster.map((seat) => seat.id + ':' + seat.score + ':' + (seat.online ? 1 : 0) + ':' + cupsKey(seat.cups)).join('|')
+  const key = roster.map((seat) => seat.id + ':' + seat.score + ':' + (seat.seen == null ? '' : seat.seen) + ':' + (seat.online ? 1 : 0) + ':' + cupsKey(seat.cups)).join('|')
     + '#' + (view.ready || []).join(',')
     + '#' + (view.results || []).map((row) => row.id + ':' + row.delta).join(',');
   if (container.dataset.key === key && container.childElementCount) return;
@@ -153,7 +221,7 @@ function paintRoster(container, view) {
     item.append(
       face,
       make('strong', null, seat.nickname),
-      make('span', null, String(seat.score))
+      make('span', null, seat.cards ? seat.seen + '/' + seat.cards : String(seat.score))
     );
     const delta = gains.get(seat.id) || 0;
     if (delta) item.append(make('span', 'quiz-delta' + (delta < 0 ? ' is-bad' : ''), quizSigned(delta)));
@@ -189,13 +257,13 @@ function paintSwipe(view, mine) {
   const down = document.getElementById('quiz-down');
   if (!box || !card || !up || !down) return;
   const phase = view && view.phase;
-  const on = phase === 'mini' || phase === 'mini_flash';
+  const on = phase === 'mini';
   box.hidden = !on;
   if (!on) return;
-  card.textContent = view.text || '';
-  card.classList.toggle('is-up', phase === 'mini_flash' && view.cardYes === true);
-  card.classList.toggle('is-down', phase === 'mini_flash' && view.cardYes === false);
-  const locked = phase !== 'mini' || (mine && mine.up != null);
+  const done = mine && mine.total && mine.index >= mine.total && !mine.busy;
+  card.textContent = done ? 'Готово' : ((mine && mine.card) || '');
+  card.classList.remove('is-up', 'is-down');
+  const locked = done || !mine || mine.busy || mine.wait;
   up.textContent = '↑ ' + (view.up || '');
   down.textContent = '↓ ' + (view.down || '');
   up.disabled = locked;
@@ -250,11 +318,12 @@ function paintQuizFace(view, me, mine, ids) {
     }
   }
   const text = document.getElementById(ids.text);
-  const cardPhase = !!(live && (live.phase === 'mini' || live.phase === 'mini_flash'));
+  const cardPhase = !!(live && ids.text === 'quiz-text' && live.phase === 'mini');
   if (text) {
     const hasText = !!(live && live.text) && !cardPhase;
     text.hidden = !hasText;
     if (text.textContent !== (hasText ? live.text : '')) text.textContent = hasText ? live.text : '';
+    text.classList.toggle('is-hold', !!(live && (live.phase === 'read' || live.phase === 'gap' || live.phase === 'bet')));
   }
   return { live, cardPhase };
 }
@@ -268,19 +337,40 @@ function paintQuizPlayer(view, me, mine) {
     text: 'quiz-text',
   });
   setQuizText('quiz-score', me ? String(me.score) : '');
+  const text = document.getElementById('quiz-text');
+  const ownTally = face.live && face.live.phase === 'mini_board' && mine && mine.total;
+  if (ownTally && text) {
+    const value = (mine.hits || 0) + ' из ' + mine.total;
+    text.hidden = false;
+    if (text.textContent !== value) text.textContent = value;
+    text.classList.add('is-score');
+    text.classList.remove('is-hold');
+    setQuizText('quiz-kicker', 'Верно');
+  } else if (text) {
+    text.classList.remove('is-score');
+  }
+  paintRules(document.getElementById('quiz-rules'), face.live && face.live.rules);
   paintOptions(document.getElementById('quiz-options'), face.live || {}, mine, false);
+  const hideRank = face.live && (face.live.phase === 'mini' || face.live.phase === 'mini_board');
+  paintBoard(document.getElementById('quiz-board'), hideRank ? null : face.live);
   paintSwipe(face.live, mine);
   paintBet(face.live, me, mine);
   const note = document.getElementById('quiz-note');
   const personal = quizPersonal(face.live, me);
   if (note) {
-    note.textContent = personal || (face.live && face.live.hint) || '';
-    note.classList.toggle('is-hint', !personal);
+    const phase = face.live && face.live.phase;
+    const lockedChoice = (phase === 'ask' || phase === 'final') && mine && mine.option != null;
+    const hint = phase === 'mini' ? '' : ((face.live && face.live.hint) || '');
+    note.textContent = lockedChoice ? 'Ответ принят' : (personal || hint);
+    note.classList.toggle('is-hint', !personal && !lockedChoice);
     note.hidden = !note.textContent;
   }
   const ready = document.getElementById('quiz-ready');
   if (ready) {
     ready.textContent = quizReadyText(face.live);
+    if (face.live && face.live.phase === 'mini' && mine && mine.total) {
+      ready.textContent = 'Верно ' + (mine.hits || 0) + ' из ' + mine.total;
+    }
     ready.hidden = !ready.textContent;
   }
   paintPodium(document.getElementById('quiz-podium'), face.live && face.live.phase === 'over' ? face.live.podium : null);
@@ -292,7 +382,9 @@ function paintQuizTv(view) {
     count: 'tv-quiz-count',
     text: 'tv-quiz-text',
   });
+  paintRules(document.getElementById('tv-quiz-rules'), face.live && face.live.rules);
   paintOptions(document.getElementById('tv-quiz-options'), face.live || {}, null, true);
+  paintBoard(document.getElementById('tv-quiz-board'), face.live);
   const card = document.getElementById('tv-quiz-card');
   if (card) {
     card.hidden = !face.cardPhase;
@@ -318,11 +410,20 @@ function syncQuizClock(kind, view) {
   const clock = document.getElementById(kind === 'tv' ? 'tv-quiz-clock' : 'quiz-clock');
   const bar = document.getElementById(kind === 'tv' ? 'tv-quiz-bar' : 'quiz-bar');
   const fill = bar ? bar.querySelector('span') : null;
+  const soft = !!(view && (view.phase === 'read' || view.phase === 'gap' || view.phase === 'final_rules' || view.phase === 'mini_intro'));
   if (!clock || !view || view.left == null || !view.limit) {
-    if (clock) clock.hidden = true;
-    if (bar) bar.hidden = true;
+    if (clock) {
+      clock.hidden = true;
+      clock.classList.remove('is-soft');
+    }
+    if (bar) {
+      bar.hidden = true;
+      bar.classList.remove('is-soft');
+    }
     return;
   }
+  if (clock) clock.classList.toggle('is-soft', soft);
+  if (bar) bar.classList.toggle('is-soft', soft);
   const draw = () => {
     const left = Math.max(0, view.left - (Date.now() - (view.at || Date.now())));
     clock.hidden = false;
@@ -347,13 +448,28 @@ function applyQuizScores(roomState, view) {
   });
 }
 
+function flashQuizResult(ok) {
+  const node = document.createElement('div');
+  node.className = 'quiz-flash ' + (ok ? 'is-ok' : 'is-bad');
+  document.body.appendChild(node);
+  setTimeout(() => {
+    if (node.parentNode) node.parentNode.removeChild(node);
+  }, 300);
+}
+
 function reactQuiz(prev, next, me, buzz) {
   if (!next || typeof buzz !== 'function') return;
   if (next.phase === 'count' && (!prev || prev.count !== next.count)) buzz(35);
   if (next.phase === 'mini' && (!prev || prev.text !== next.text || prev.kicker !== next.kicker)) buzz(25);
   if (prev && prev.phase === next.phase) return;
-  if (next.phase === 'ask' || next.phase === 'final') buzz([30, 20, 40]);
-  if (next.phase === 'mini_intro' || next.phase === 'bet') buzz([20, 30, 20]);
+  if (next.phase === 'read') buzz(22);
+  if (next.phase === 'ask' || next.phase === 'final') buzz([40, 24, 48]);
+  if (next.phase === 'mini_intro' || next.phase === 'final_rules' || next.phase === 'bet') buzz([20, 30, 20]);
+  if (next.phase === 'reveal' || next.phase === 'final_reveal') {
+    const row = me && (next.results || []).find((item) => item.id === me.id);
+    flashQuizResult(!!(row && row.ok));
+  }
+  if (next.phase === 'mini_board') buzz([30, 20, 50]);
   if (next.phase === 'reveal' || next.phase === 'final_reveal' || next.phase === 'mini_flash') {
     const row = me && (next.results || []).find((item) => item.id === me.id);
     if (row && row.ok && row.delta > 0) buzz([40, 30, 40, 30, 90]);

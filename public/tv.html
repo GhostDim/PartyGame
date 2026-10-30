@@ -7,18 +7,29 @@
   <title>PartyBox — экран</title>
   <link rel="stylesheet" href="/style.css">
 </head>
-<body class="page-tv">
+<body class="page-tv is-lobby">
   <p id="conn" class="conn" hidden>Нет связи с консолью, переподключение…</p>
   <div class="wrap">
     <p id="phones-banner" class="banner" hidden>Ведущий включил режим «Только телефоны»</p>
-    <header>
+    <header id="tv-head">
       <p class="brand">PartyBox</p>
       <h1 id="tv-title">Лобби</h1>
       <p id="tv-status" class="wait is-waiting">Ожидание гостей</p>
     </header>
     <div id="tv-lobby">
+      <div class="lobby-hero">
+        <div class="lobby-logo" aria-hidden="true">
+          <span class="lobby-logo-spin"></span>
+          <span class="lobby-logo-spin is-inner"></span>
+          <span class="lobby-logo-core">PB</span>
+        </div>
+        <p class="lobby-brand">PartyBox</p>
+        <h1 class="lobby-title"><span>Лобби</span></h1>
+        <p id="tv-lobby-status" class="lobby-status is-waiting">Ожидание гостей</p>
+        <p id="tv-lobby-count" class="lobby-count">0 из 12</p>
+      </div>
       <div id="bars" class="tv-bars"></div>
-      <ul id="guests" class="guest-grid"></ul>
+      <ul id="guests" class="guest-grid" aria-label="Гости"></ul>
     </div>
     <div id="tv-bomb" hidden>
       <div id="tv-bomb-chain" class="bomb-lineup" aria-label="Очередь передачи"></div>
@@ -40,7 +51,9 @@
       <div id="tv-quiz-bar" class="quiz-bar" hidden><span></span></div>
       <p id="tv-quiz-count" class="bomb-count" aria-live="assertive" hidden></p>
       <p id="tv-quiz-text" class="quiz-text"></p>
+      <ul id="tv-quiz-rules" class="quiz-rules" hidden></ul>
       <div id="tv-quiz-options" class="quiz-options"></div>
+      <ol id="tv-quiz-board" class="quiz-board" hidden></ol>
       <p id="tv-quiz-card" class="quiz-card" hidden></p>
       <p id="tv-quiz-hint" class="quiz-note is-hint"></p>
       <div id="tv-quiz-bets" class="quiz-bets"></div>

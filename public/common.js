@@ -79,23 +79,45 @@ function gameTitle(state, gameId) {
 
 function fillBars(container, games, pendingGame, selectedGame) {
   const max = games.reduce((top, game) => Math.max(top, game.votes), 0);
-  clearNode(container);
+  const signature = games.map((game) => game.id).join('|');
+  if (container.dataset.games !== signature) {
+    clearNode(container);
+    container.dataset.games = signature;
+  }
   container.dataset.count = String(games.length);
-  games.forEach((game) => {
+  games.forEach((game, index) => {
+    let card = container.children[index];
+    if (!card) {
+      card = make('div', 'tv-bar');
+      const bar = make('div', 'bar');
+      bar.appendChild(make('span'));
+      card.append(
+        make('h2'),
+        make('p', 'tv-game-desc'),
+        make('p', 'tv-game-votes'),
+        make('p', 'tv-game-note'),
+        bar
+      );
+      container.appendChild(card);
+    }
     const leading = game.id === pendingGame && game.votes > 0;
     const host = game.id === selectedGame;
-    const card = make('div', 'tv-bar' + (game.id === pendingGame ? ' is-picked' : ''));
-    const title = make('h2', null, game.title);
-    const about = make('p', 'tv-game-desc', game.description || '');
-    about.hidden = !about.textContent;
-    const votes = make('p', 'tv-game-votes', votesLabel(game.votes));
-    const note = make('p', 'tv-game-note', host ? 'Выбор ведущего' : (leading ? 'Лидирует' : ''));
-    note.hidden = !note.textContent;
-    const bar = make('div', 'bar');
-    const fill = make('span');
+    card.classList.toggle('is-picked', game.id === pendingGame);
+    const title = card.querySelector('h2');
+    const about = card.querySelector('.tv-game-desc');
+    const votes = card.querySelector('.tv-game-votes');
+    const note = card.querySelector('.tv-game-note');
+    const fill = card.querySelector('.bar > span');
+    if (title.textContent !== game.title) title.textContent = game.title;
+    const desc = game.description || '';
+    if (about.textContent !== desc) about.textContent = desc;
+    about.hidden = !desc;
+    const voteText = votesLabel(game.votes);
+    if (votes.textContent !== voteText) votes.textContent = voteText;
+    const noteText = host ? 'Выбор ведущего' : (leading ? 'Лидирует' : '');
+    if (note.textContent !== noteText) note.textContent = noteText;
+    note.hidden = !noteText;
     fill.style.height = (max > 0 ? Math.round((game.votes / max) * 100) : 0) + '%';
-    bar.appendChild(fill);
-    card.append(title, about, votes, note, bar);
-    container.appendChild(card);
   });
+  while (container.children.length > games.length) container.removeChild(container.lastChild);
 }

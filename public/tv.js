@@ -3,19 +3,119 @@ let room = null;
 let bomb = null;
 let quiz = null;
 
+function seatTotal() {
+  if (room && Array.isArray(room.avatars) && room.avatars.length) return room.avatars.length;
+  return 12;
+}
+
+function emptySeat() {
+  const item = make('li', 'guest is-empty');
+  item.setAttribute('aria-hidden', 'true');
+  item.append(make('span', 'seat'));
+  return item;
+}
+
+function paintGuest(item, player, showScore) {
+  item.classList.remove('is-empty');
+  item.removeAttribute('aria-hidden');
+  item.dataset.id = player.id;
+  const seat = item.querySelector('.seat');
+  if (seat) seat.remove();
+  let face = item.querySelector('.face');
+  let name = item.querySelector('.name');
+  let score = item.querySelector('.score');
+  if (!face) item.appendChild(face = make('span', 'face'));
+  if (!name) item.appendChild(name = make('span', 'name'));
+  if (!score) item.appendChild(score = make('span', 'score'));
+  paintFace(face, player.avatar, player.cups);
+  if (name.textContent !== player.nickname) name.textContent = player.nickname;
+  score.hidden = !showScore;
+  if (showScore) {
+    const text = pointsLabel(player.score);
+    if (score.textContent !== text) score.textContent = text;
+  }
+}
+
+function vacateGuest(item) {
+  item.classList.add('is-empty');
+  item.setAttribute('aria-hidden', 'true');
+  delete item.dataset.id;
+  clearNode(item);
+  item.append(make('span', 'seat'));
+}
+
 function renderGuests(players, showScore) {
   const list = document.getElementById('guests');
   const online = players.filter((player) => player.isOnline);
-  clearNode(list);
+  const dock = document.body.classList.contains('is-lobby');
+  if (!dock) {
+    for (const item of [...list.children]) {
+      if (item.classList.contains('is-empty')) item.remove();
+    }
+    const nodes = new Map();
+    for (const item of list.children) nodes.set(item.dataset.id, item);
+    const seen = new Set();
+    online.forEach((player) => {
+      seen.add(player.id);
+      let item = nodes.get(player.id);
+      if (!item) {
+        item = make('li', 'guest');
+        nodes.set(player.id, item);
+        list.appendChild(item);
+      }
+      paintGuest(item, player, showScore);
+    });
+    for (const [id, item] of nodes) {
+      if (!seen.has(id)) item.remove();
+    }
+    online.forEach((player) => {
+      const item = nodes.get(player.id);
+      if (item && item.isConnected) list.appendChild(item);
+    });
+    list.dataset.count = String(online.length);
+    return;
+  }
+  const seats = seatTotal();
+  list.style.setProperty('--seat-count', String(seats));
+  while (list.children.length < seats) list.appendChild(emptySeat());
+  while (list.children.length > seats) list.removeChild(list.lastChild);
+  const seen = new Set();
+  for (const item of list.children) {
+    if (!item.dataset.id) continue;
+    const player = online.find((entry) => entry.id === item.dataset.id);
+    if (!player) vacateGuest(item);
+    else {
+      seen.add(player.id);
+      paintGuest(item, player, false);
+    }
+  }
+  for (const player of online) {
+    if (seen.has(player.id)) continue;
+    const slot = [...list.children].find((item) => item.classList.contains('is-empty'));
+    if (!slot) break;
+    paintGuest(slot, player, false);
+  }
   list.dataset.count = String(online.length);
-  online.forEach((player) => {
-    const item = make('li', 'guest');
-    const face = make('span', 'face');
-    paintFace(face, player.avatar, player.cups);
-    item.append(face, make('span', 'name', player.nickname));
-    if (showScore) item.append(make('span', 'score', pointsLabel(player.score)));
-    list.appendChild(item);
-  });
+}
+
+function paintStatus(text, waiting) {
+  const status = document.getElementById('tv-status');
+  const lobbyStatus = document.getElementById('tv-lobby-status');
+  status.textContent = text;
+  status.classList.toggle('is-waiting', !!waiting);
+  if (lobbyStatus) {
+    lobbyStatus.textContent = text;
+    lobbyStatus.classList.toggle('is-waiting', !!waiting);
+  }
+}
+
+function paintLobbyCount() {
+  const node = document.getElementById('tv-lobby-count');
+  if (!node || !room) return;
+  const total = seatTotal();
+  let online = 0;
+  for (const player of room.players) if (player.isOnline) online += 1;
+  node.textContent = online + ' из ' + total;
 }
 
 function paintTvBomb() {
@@ -80,9 +180,10 @@ function paintTvBomb() {
 function render(next) {
   room = next;
   if (!room) return;
+  document.body.classList.toggle('is-lobby', room.roundStatus !== 'playing');
   const online = room.players.filter((player) => player.isOnline);
   const title = document.getElementById('tv-title');
-  const status = document.getElementById('tv-status');
+  paintLobbyCount();
   const hot = room.roundStatus === 'playing' && room.activeGame === 'hotbomb';
   const quizOn = room.roundStatus === 'playing' && room.activeGame === 'quiz';
   const showBomb = hot && room.tvMode;
@@ -96,12 +197,12 @@ function render(next) {
 
   if (hot) {
     title.textContent = gameTitle(room, room.activeGame);
-    status.classList.remove('is-waiting');
-    if (!room.tvMode) status.textContent = 'Игра идёт на телефонах';
-    else if (!bomb || bomb.phase === 'countdown') status.textContent = 'Приготовьтесь';
-    else if (bomb.phase === 'boom') status.textContent = 'Взрыв';
-    else if (bomb.phase === 'over') status.textContent = 'Победители';
-    else status.textContent = 'Бомба у ' + (holderName(bomb) || 'игрока');
+    let line = 'Бомба у ' + (holderName(bomb) || 'игрока');
+    if (!room.tvMode) line = 'Игра идёт на телефонах';
+    else if (!bomb || bomb.phase === 'countdown') line = 'Приготовьтесь';
+    else if (bomb.phase === 'boom') line = 'Взрыв';
+    else if (bomb.phase === 'over') line = 'Победители';
+    paintStatus(line, false);
     if (!showBomb) renderGuests(room.players, true);
     if (showBomb) paintTvBomb();
     return;
@@ -109,8 +210,7 @@ function render(next) {
 
   if (quizOn) {
     title.textContent = gameTitle(room, room.activeGame);
-    status.classList.remove('is-waiting');
-    status.textContent = quizStatus(quiz, room.tvMode);
+    paintStatus(quizStatus(quiz, room.tvMode), false);
     if (showQuiz) paintQuizTv(quiz);
     else renderGuests(room.players, true);
     return;
@@ -123,16 +223,13 @@ function render(next) {
   }
   if (room.roundStatus === 'playing') {
     title.textContent = gameTitle(room, room.activeGame);
-    status.textContent = 'Игра началась';
-    status.classList.remove('is-waiting');
+    paintStatus('Игра началась', false);
   } else if (!online.length) {
     title.textContent = 'Лобби';
-    status.textContent = 'Ожидание гостей';
-    status.classList.add('is-waiting');
+    paintStatus('Ожидание гостей', true);
   } else {
     title.textContent = 'Лобби';
-    status.textContent = 'Ожидание запуска игры ведущим...';
-    status.classList.add('is-waiting');
+    paintStatus('Ожидание запуска игры ведущим...', true);
   }
 
   renderGuests(room.players, false);
@@ -167,9 +264,7 @@ socket.on('game_start', (payload) => {
     return;
   }
   document.getElementById('tv-title').textContent = (payload && payload.title) || 'Игра';
-  const status = document.getElementById('tv-status');
-  status.textContent = 'Игра началась';
-  status.classList.remove('is-waiting');
+  paintStatus('Игра началась', false);
 });
 
 socket.on('bomb_state', (next) => {
@@ -191,3 +286,10 @@ socket.on('quiz_state', (next) => {
   syncQuizClock('tv', quiz);
   if (room && (room.roundStatus === 'playing' || !quiz)) render(room);
 });
+
+if (document.body.classList.contains('is-lobby')) {
+  const list = document.getElementById('guests');
+  const seats = seatTotal();
+  list.style.setProperty('--seat-count', String(seats));
+  while (list.children.length < seats) list.appendChild(emptySeat());
+}
