@@ -3,6 +3,7 @@ let room = null;
 let bomb = null;
 let quiz = null;
 let eki = null;
+let echo = null;
 
 function seatTotal() {
   if (room && Array.isArray(room.avatars) && room.avatars.length) return room.avatars.length;
@@ -188,19 +189,25 @@ function render(next) {
   const hot = room.roundStatus === 'playing' && room.activeGame === 'hotbomb';
   const quizOn = room.roundStatus === 'playing' && room.activeGame === 'quiz';
   const ekiOn = room.roundStatus === 'playing' && room.activeGame === 'ekivoki';
+  const echoOn = room.roundStatus === 'playing' && room.activeGame === 'echo';
   const showBomb = hot && room.tvMode;
   const showQuiz = quizOn && room.tvMode;
   const showEki = ekiOn && room.tvMode;
+  const showEcho = echoOn && room.tvMode;
   document.body.classList.toggle('is-eki', showEki);
+  document.body.classList.toggle('is-echo', showEcho);
   if (!showEki) syncEkiClock('tv', null);
+  if (!showEcho) syncEchoClock('tv', null);
   document.getElementById('phones-banner').hidden = room.tvMode;
-  document.getElementById('tv-lobby').hidden = showBomb || showQuiz || showEki;
-  document.getElementById('bars').hidden = hot || quizOn || ekiOn;
+  document.getElementById('tv-lobby').hidden = showBomb || showQuiz || showEki || showEcho;
+  document.getElementById('bars').hidden = hot || quizOn || ekiOn || echoOn;
   document.getElementById('tv-bomb').hidden = !showBomb;
   const quizBox = document.getElementById('tv-quiz');
   if (quizBox) quizBox.hidden = !showQuiz;
   const ekiBox = document.getElementById('tv-ekivoki');
   if (ekiBox) ekiBox.hidden = !showEki;
+  const echoBox = document.getElementById('tv-echo');
+  if (echoBox) echoBox.hidden = !showEcho;
 
   if (hot) {
     title.textContent = gameTitle(room, room.activeGame);
@@ -231,12 +238,22 @@ function render(next) {
     return;
   }
 
+  if (echoOn) {
+    title.textContent = gameTitle(room, room.activeGame);
+    paintStatus(room.tvMode ? echoTvLine(echo) : 'Игра идёт на телефонах', false);
+    if (showEcho) paintEchoTv(echo);
+    else renderGuests(room.players, true);
+    return;
+  }
+
   if (room.roundStatus !== 'playing') {
     bomb = null;
     if (quiz) syncQuizClock('tv', null);
     quiz = null;
     syncEkiClock('tv', null);
     eki = null;
+    syncEchoClock('tv', null);
+    echo = null;
   }
   if (room.roundStatus === 'playing') {
     title.textContent = gameTitle(room, room.activeGame);
@@ -274,7 +291,7 @@ socket.on('votes_updated', (data) => {
 
 socket.on('game_start', (payload) => {
   const gameId = payload && payload.gameId;
-  if ((gameId === 'hotbomb' || gameId === 'quiz' || gameId === 'ekivoki') && room) {
+  if ((gameId === 'hotbomb' || gameId === 'quiz' || gameId === 'ekivoki' || gameId === 'echo') && room) {
     room.roundStatus = 'playing';
     room.activeGame = gameId;
     render(room);
@@ -313,6 +330,15 @@ socket.on('ekivoki_state', (next) => {
   if (room && (room.roundStatus === 'playing' || !eki)) render(room);
 });
 
+socket.on('echo_state', (next) => {
+  echo = next && next.phase ? next : null;
+  if (echo) {
+    echo.at = Date.now();
+    applyEchoScores(room, echo);
+  }
+  if (room && (room.roundStatus === 'playing' || !echo)) render(room);
+});
+
 document.addEventListener('eki-landed', (event) => {
   if (!event.target || event.target.id !== 'tv-eki-die') return;
   if (room) paintEkiTv(eki);
@@ -324,3 +350,20 @@ if (document.body.classList.contains('is-lobby')) {
   list.style.setProperty('--seat-count', String(seats));
   while (list.children.length < seats) list.appendChild(emptySeat());
 }
+
+let screenLock = null;
+
+async function holdScreen() {
+  if (!navigator.wakeLock || document.visibilityState !== 'visible') return;
+  try {
+    screenLock = await navigator.wakeLock.request('screen');
+  } catch (err) {
+    screenLock = null;
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') holdScreen();
+});
+
+holdScreen();

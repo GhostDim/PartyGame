@@ -9,6 +9,7 @@ const { Audio } = require('./lib/audio');
 const { HotBomb } = require('./games/hotbomb');
 const { Quiz } = require('./games/quiz');
 const { Ekivoki } = require('./games/ekivoki');
+const { Echo } = require('./games/echo');
 
 const PORT = 3000;
 const ADMIN_PASSWORD = 'admin';
@@ -77,6 +78,10 @@ function sendGame(socket) {
   if (game instanceof Ekivoki) {
     socket.emit('ekivoki_state', game.view());
     if (socket.data.playerId) socket.emit('ekivoki_mine', game.mine(socket.data.playerId));
+  }
+  if (game instanceof Echo) {
+    socket.emit('echo_state', game.view());
+    if (socket.data.playerId) socket.emit('echo_mine', game.mine(socket.data.playerId));
   }
 }
 
@@ -220,6 +225,10 @@ io.on('connection', (socket) => {
       socket.emit('admin_notice', { message: 'Для «Экивоки» нужны минимум 2 игрока в сети' });
       return;
     }
+    if (gameId === 'echo' && onlineCount() < 2) {
+      socket.emit('admin_notice', { message: 'Для «Эхо» нужны минимум 2 игрока в сети' });
+      return;
+    }
     const result = state.start();
     if (!result.ok) {
       socket.emit('admin_notice', { message: result.error });
@@ -250,6 +259,16 @@ io.on('connection', (socket) => {
       });
       if (!game.init()) {
         const message = game.problem || 'Не удалось начать экивоки';
+        abortGame(message);
+        return;
+      }
+    } else if (result.game.id === 'echo') {
+      game = new Echo(io, state, {
+        onScores: broadcast,
+        onAbort: abortGame,
+      });
+      if (!game.init()) {
+        const message = game.problem || 'Не удалось начать эхо';
         abortGame(message);
         return;
       }

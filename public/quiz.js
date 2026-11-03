@@ -458,13 +458,16 @@ function flashQuizResult(ok) {
 }
 
 function reactQuiz(prev, next, me, buzz) {
-  if (!next || typeof buzz !== 'function') return;
+  if (!next || typeof buzz !== 'function' || !me) return;
+  const seated = (next.roster || []).some((seat) => seat.id === me.id);
+  if (!seated) return;
   if (next.phase === 'count' && (!prev || prev.count !== next.count)) buzz(35);
-  if (next.phase === 'mini' && (!prev || prev.text !== next.text || prev.kicker !== next.kicker)) buzz(25);
+  if (next.phase === 'mini' && (!prev || prev.phase !== 'mini')) buzz([50, 30, 70]);
+  else if (next.phase === 'mini' && prev && (prev.text !== next.text || prev.kicker !== next.kicker)) buzz(25);
   if (prev && prev.phase === next.phase) return;
   if (next.phase === 'read') buzz(22);
-  if (next.phase === 'ask' || next.phase === 'final') buzz([40, 24, 48]);
-  if (next.phase === 'mini_intro' || next.phase === 'final_rules' || next.phase === 'bet') buzz([20, 30, 20]);
+  if (next.phase === 'ask' || next.phase === 'final' || next.phase === 'bet') buzz([50, 30, 70]);
+  if (next.phase === 'mini_intro' || next.phase === 'final_rules') buzz([20, 30, 20]);
   if (next.phase === 'reveal' || next.phase === 'final_reveal') {
     const row = me && (next.results || []).find((item) => item.id === me.id);
     flashQuizResult(!!(row && row.ok));

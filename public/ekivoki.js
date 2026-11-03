@@ -610,7 +610,7 @@ function reactEki(prev, next, me, buzz) {
   if (!me) return;
   const opened = next.turnId === me.id && next.phase === 'roll'
     && (!prev || prev.turnId !== me.id || prev.phase !== 'roll');
-  if (opened) buzz([46, 30, 46]);
+  if (opened) buzz([50, 30, 70]);
   const landed = next.turnId === me.id && next.phase === 'read'
     && (!prev || prev.phase !== 'read' || prev.turnNo !== next.turnNo);
   if (landed) buzz(28);

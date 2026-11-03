@@ -21,6 +21,8 @@ let quiz = null;
 let quizMine = null;
 let eki = null;
 let ekiMine = null;
+let echo = null;
+let echoMine = null;
 let hostNote = '';
 let chosen = null;
 let seenStatus = null;
@@ -284,9 +286,12 @@ function render() {
     syncEkiClock('player', null);
     eki = null;
     ekiMine = null;
+    syncEchoClock('player', null);
+    echo = null;
+    echoMine = null;
   }
   if (room.roundStatus === 'playing') {
-    if (room.activeGame !== 'hotbomb' && room.activeGame !== 'quiz' && room.activeGame !== 'ekivoki') {
+    if (room.activeGame !== 'hotbomb' && room.activeGame !== 'quiz' && room.activeGame !== 'ekivoki' && room.activeGame !== 'echo') {
       document.getElementById('play-title').textContent = gameTitle(room, room.activeGame);
       document.getElementById('play-note').textContent = room.tvMode
         ? 'Следите за общим экраном. Кнопки раунда появятся здесь.'
@@ -296,6 +301,7 @@ function render() {
     paintPlayerBomb();
     paintPlayerQuiz();
     paintPlayerEki();
+    paintPlayerEcho();
   } else {
     show('lobby');
     renderGames();
@@ -333,6 +339,9 @@ function renderRank() {
     if (diff) return diff;
     return a.nickname.localeCompare(b.nickname, 'ru');
   });
+  const key = players.map((player) => player.id + ':' + player.nickname + ':' + cupsKey(player.cups) + ':' + (me && player.id === me.id ? 1 : 0)).join('|');
+  if (list.dataset.key === key) return;
+  list.dataset.key = key;
   clearNode(list);
   if (!players.length) {
     list.appendChild(make('li', 'muted', 'Пока никого нет'));
@@ -356,20 +365,27 @@ function renderRank() {
 function renderHost() {
   if (!isHost || !hostAuthed || !room || !hostDialog) return;
   paintEkiHost(eki, room);
+  paintEchoHost(echo, room);
   ensureGames(room.games);
 
   const votes = document.getElementById('votes');
-  const max = room.games.reduce((top, game) => Math.max(top, game.votes), 0);
-  clearNode(votes);
-  room.games.forEach((game) => {
-    const row = make('div');
-    const bar = make('div', 'bar');
-    const fill = make('span');
-    fill.style.width = (max > 0 ? Math.round((game.votes / max) * 100) : 0) + '%';
-    bar.appendChild(fill);
-    row.append(make('strong', null, game.title + ' — ' + votesLabel(game.votes)), bar);
-    votes.appendChild(row);
-  });
+  if (votes) {
+    const voteKey = room.games.map((game) => game.id + ':' + game.votes).join('|');
+    if (votes.dataset.key !== voteKey) {
+      votes.dataset.key = voteKey;
+      const max = room.games.reduce((top, game) => Math.max(top, game.votes), 0);
+      clearNode(votes);
+      room.games.forEach((game) => {
+        const row = make('div');
+        const bar = make('div', 'bar');
+        const fill = make('span');
+        fill.style.width = (max > 0 ? Math.round((game.votes / max) * 100) : 0) + '%';
+        bar.appendChild(fill);
+        row.append(make('strong', null, game.title + ' — ' + votesLabel(game.votes)), bar);
+        votes.appendChild(row);
+      });
+    }
+  }
 
   const tvModeInput = document.getElementById('tv-mode');
   const gameSelect = document.getElementById('game-select');
@@ -481,6 +497,20 @@ function paintPlayerQuiz() {
   paintQuizPlayer(quiz, me, quizMine);
 }
 
+function paintPlayerEcho() {
+  const box = document.getElementById('play-echo');
+  const generic = document.getElementById('play-generic');
+  if (!box) return;
+  const playing = !!(room && room.roundStatus === 'playing' && room.activeGame === 'echo');
+  if (!playing) {
+    box.hidden = true;
+    return;
+  }
+  if (generic) generic.hidden = true;
+  box.hidden = false;
+  paintEchoPlayer(echo, echoMine, me, room);
+}
+
 function paintPlayerEki() {
   const box = document.getElementById('play-ekivoki');
   const generic = document.getElementById('play-generic');
@@ -582,6 +612,33 @@ if (quizLock) quizLock.addEventListener('click', () => sendQuizBet(true));
 });
 const ekiFail = document.getElementById('eki-fail');
 if (ekiFail) ekiFail.addEventListener('click', () => sendEki('fail'));
+
+const echoJoinLeft = document.getElementById('echo-join-left');
+const echoJoinRight = document.getElementById('echo-join-right');
+const echoNameForm = document.getElementById('echo-name-form');
+const echoBeginPlay = document.getElementById('echo-begin');
+if (echoJoinLeft) {
+  echoJoinLeft.addEventListener('click', () => {
+    socket.emit('player_action', { type: 'join', side: 'left' });
+  });
+}
+if (echoJoinRight) {
+  echoJoinRight.addEventListener('click', () => {
+    socket.emit('player_action', { type: 'join', side: 'right' });
+  });
+}
+if (echoNameForm) {
+  echoNameForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const input = document.getElementById('echo-name');
+    socket.emit('player_action', { type: 'name', name: input ? input.value : '' });
+  });
+}
+if (echoBeginPlay) {
+  echoBeginPlay.addEventListener('click', () => {
+    socket.emit('player_action', { type: 'begin' });
+  });
+}
 document.addEventListener('eki-landed', (event) => {
   if (!event.target || event.target.id !== 'eki-die') return;
   paintPlayerEki();
@@ -682,6 +739,30 @@ if (isHost) {
     ekiSkipYes.addEventListener('click', () => {
       document.getElementById('eki-skip-confirm').hidden = true;
       ekiSkip.hidden = false;
+      socket.emit('player_action', { type: 'skip' });
+    });
+  }
+  const echoBegin = document.getElementById('echo-host-begin');
+  const echoSkip = document.getElementById('echo-host-skip');
+  const echoSkipYes = document.getElementById('echo-host-skip-yes');
+  const echoSkipNo = document.getElementById('echo-host-skip-no');
+  if (echoBegin) {
+    echoBegin.addEventListener('click', () => {
+      socket.emit('player_action', { type: 'begin' });
+    });
+  }
+  if (echoSkip && echoSkipYes && echoSkipNo) {
+    echoSkip.addEventListener('click', () => {
+      echoSkip.hidden = true;
+      document.getElementById('echo-host-skip-confirm').hidden = false;
+    });
+    echoSkipNo.addEventListener('click', () => {
+      document.getElementById('echo-host-skip-confirm').hidden = true;
+      echoSkip.hidden = false;
+    });
+    echoSkipYes.addEventListener('click', () => {
+      document.getElementById('echo-host-skip-confirm').hidden = true;
+      echoSkip.hidden = false;
       socket.emit('player_action', { type: 'skip' });
     });
   }
@@ -787,7 +868,7 @@ socket.on('game_start', (payload) => {
     room.roundStatus = 'playing';
     room.activeGame = gameId;
   }
-  if (gameId === 'hotbomb' || gameId === 'quiz' || gameId === 'ekivoki') {
+  if (gameId === 'hotbomb' || gameId === 'quiz' || gameId === 'ekivoki' || gameId === 'echo') {
     show('play');
     render();
     return;
@@ -844,6 +925,28 @@ socket.on('ekivoki_state', (next) => {
 socket.on('ekivoki_mine', (next) => {
   ekiMine = next || null;
   if (me && room && room.roundStatus === 'playing') paintPlayerEki();
+});
+
+socket.on('echo_state', (next) => {
+  const prev = echo;
+  echo = next && next.phase ? next : null;
+  if (echo) {
+    echo.at = Date.now();
+    applyEchoScores(room, echo);
+  } else {
+    echoMine = null;
+  }
+  reactEcho(prev, echo, me, buzz);
+  if (me && room && (room.roundStatus === 'playing' || !echo)) render();
+  else if (isHost) paintEchoHost(echo, room);
+});
+
+socket.on('echo_mine', (next) => {
+  const prev = echoMine;
+  echoMine = next || null;
+  if (prev && echoMine && echoMine.failed && !prev.failed) buzz([70, 40, 110]);
+  else if (prev && echoMine && echoMine.done && !prev.done && !echoMine.failed) buzz([30, 24, 30]);
+  if (me && room && room.roundStatus === 'playing') paintPlayerEcho();
 });
 
 function hideBoard() {
@@ -913,3 +1016,27 @@ if (isHost) {
     }
   });
 }
+
+let screenLock = null;
+
+async function holdScreen() {
+  if (!navigator.wakeLock || document.visibilityState !== 'visible' || screenLock) return;
+  try {
+    screenLock = await navigator.wakeLock.request('screen');
+    screenLock.addEventListener('release', () => {
+      screenLock = null;
+    });
+  } catch (err) {
+    screenLock = null;
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') holdScreen();
+});
+
+document.addEventListener('pointerdown', () => {
+  holdScreen();
+});
+
+holdScreen();

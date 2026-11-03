@@ -128,6 +128,41 @@
         <ol id="eki-list" class="eki-list" hidden></ol>
         <div id="eki-podium" class="bomb-winners eki-podium" hidden></div>
       </div>
+      <div id="play-echo" hidden>
+        <div class="echo-scores">
+          <p id="echo-left-score" class="echo-score is-left"></p>
+          <p id="echo-right-score" class="echo-score is-right"></p>
+        </div>
+        <p id="echo-count" class="echo-count" hidden></p>
+        <p id="echo-status" class="echo-status"></p>
+        <div id="echo-draft" class="echo-draft" hidden>
+          <button id="echo-join-left" class="echo-side is-left" type="button">
+            <span class="echo-side-title"></span>
+            <span class="echo-side-people"></span>
+          </button>
+          <button id="echo-join-right" class="echo-side is-right" type="button">
+            <span class="echo-side-title"></span>
+            <span class="echo-side-people"></span>
+          </button>
+          <form id="echo-name-form" hidden>
+            <label for="echo-name">Название стороны</label>
+            <input id="echo-name" maxlength="16" autocomplete="off">
+            <button type="submit">Сохранить</button>
+          </form>
+          <p id="echo-name-error" class="error" hidden></p>
+        </div>
+        <div id="echo-lanes" class="echo-lanes" hidden>
+          <ol id="echo-lane-left" class="is-left"></ol>
+          <ol id="echo-lane-right" class="is-right"></ol>
+        </div>
+        <p id="echo-watch" class="echo-watch" hidden>Смотри на телевизор</p>
+        <div id="echo-cast" class="echo-cast" hidden></div>
+        <div id="echo-grid" class="echo-grid" hidden></div>
+        <p id="echo-clock" class="echo-clock" hidden></p>
+        <div id="echo-bar" class="echo-bar" hidden><span></span></div>
+        <button id="echo-begin" class="go" type="button" hidden>Начать раунд</button>
+        <div id="echo-podium" class="echo-podium" hidden></div>
+      </div>
     </section>
   </div>
 
@@ -150,9 +185,9 @@
   <dialog id="player-settings" class="sheet">
     <h2>Настройки</h2>
     <label class="toggle">
-      <input id="vibrate-toggle" type="checkbox">
+      <input id="vibrate-toggle" type="checkbox" checked>
       <span class="toggle-ui"></span>
-      <span>Вибрация при нажатии</span>
+      <span>Вибрация</span>
     </label>
     <p id="vibrate-hint" class="muted" hidden></p>
     <div id="lights-settings">
@@ -202,6 +237,16 @@
         <button id="eki-skip-no" class="ghost" type="button">Оставить ход</button>
       </div>
     </div>
+    <div id="echo-host" hidden>
+      <p id="echo-host-note" class="wait"></p>
+      <button id="echo-host-begin" class="go" type="button">Начать раунд</button>
+      <button id="echo-host-skip" class="danger" type="button">Пропустить дуэль</button>
+      <div id="echo-host-skip-confirm" hidden>
+        <p class="wait">Закрыть дуэль на последней взятой длине? Кто уже ввёл цепочку верно, сохраняет её.</p>
+        <button id="echo-host-skip-yes" class="danger" type="button">Да, пропустить</button>
+        <button id="echo-host-skip-no" class="ghost" type="button">Оставить дуэль</button>
+      </div>
+    </div>
     <p id="start-hint" class="wait"></p>
     <button id="start" class="go" type="button">Начать игру</button>
     <button id="abort" class="danger" type="button" hidden>Выйти в лобби</button>
@@ -218,6 +263,7 @@
   <script src="/bomb.js"></script>
   <script src="/quiz.js"></script>
   <script src="/ekivoki.js"></script>
+  <script src="/echo.js"></script>
   <script src="/player.js"></script>
 </body>
 </html>

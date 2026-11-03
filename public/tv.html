@@ -79,12 +79,37 @@
         </aside>
       </div>
     </div>
+    <div id="tv-echo" hidden>
+      <div class="echo-stage">
+        <aside class="echo-rail is-left" aria-label="Левая сторона">
+          <p id="tv-echo-left-title" class="echo-rail-title"></p>
+          <p id="tv-echo-left-score" class="echo-rail-score"></p>
+          <ol id="tv-echo-left"></ol>
+        </aside>
+        <div class="echo-center">
+          <div id="tv-echo-cast" class="echo-cast" hidden></div>
+          <p id="tv-echo-count" class="echo-count" hidden></p>
+          <div id="tv-echo-grid" class="echo-grid" hidden></div>
+          <p id="tv-echo-clock" class="echo-clock" hidden></p>
+          <div id="tv-echo-bar" class="echo-bar" hidden><span></span></div>
+          <p id="tv-echo-note" class="echo-note"></p>
+          <p id="tv-echo-bench" class="echo-bench" hidden></p>
+          <div id="tv-echo-podium" class="echo-podium" hidden></div>
+        </div>
+        <aside class="echo-rail is-right" aria-label="Правая сторона">
+          <p id="tv-echo-right-title" class="echo-rail-title"></p>
+          <p id="tv-echo-right-score" class="echo-rail-score"></p>
+          <ol id="tv-echo-right"></ol>
+        </aside>
+      </div>
+    </div>
   </div>
   <script src="/socket.io/socket.io.js"></script>
   <script src="/common.js"></script>
   <script src="/bomb.js"></script>
   <script src="/quiz.js"></script>
   <script src="/ekivoki.js"></script>
+  <script src="/echo.js"></script>
   <script src="/tv.js"></script>
 </body>
 </html>
